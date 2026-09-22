@@ -169,5 +169,3 @@ dependencies:
     - pofo_tools==0.1.0a0
     - scikit-learn==1.9.1
     - seaborn==0.13.2
-
-prefix: "/weka/home/jhu/jkim789/miniforge3/envs/pooch"
