@@ -16,6 +16,25 @@ POOCH is a Snakemake-based pipeline for assigning chromosome labels and determin
 The input contigs do not need to be telomere-to-telomere assemblies and may consist of multiple scaffolds, but they must be correctly assigned to their respective haplotypes.
 <img src="figures/inputContigs.png" alt="input Contigs" width="1000">
 
+## Installation
+
+```bash
+# clone this git repository
+git clone https://github.com/marbl/Pooch.git
+cd Pooch/
+
+# make new environment usimg yml file
+mamba create -n pooch -f Pooch_environment.yml  -vvv --channel-priority flexible
+
+# activate env
+mamba activate pooch
+
+# move working directory to pofo_tools within Pooch
+cd pofo_tools/ 
+
+# install python package
+pip install .
+```
 
 ## Prediction
 
