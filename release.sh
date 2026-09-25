@@ -12,13 +12,13 @@ VERSION="$1"
 TAG="v${VERSION}"
 TODAY=$(date +"%Y-%m-%d")
 
-# Basic semantic version validation
+# Validate version
 if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
     echo "Error: version must look like 0.2.0"
     exit 1
 fi
 
-# Make sure required files exist
+# Required files
 for FILE in version.txt CHANGELOG.md CITATION.cff; do
     if [ ! -f "$FILE" ]; then
         echo "Error: required file not found: $FILE"
@@ -26,10 +26,10 @@ for FILE in version.txt CHANGELOG.md CITATION.cff; do
     fi
 done
 
-# Make sure working tree is clean
+# Require clean working tree
 if [ -n "$(git status --porcelain)" ]; then
     echo "Error: working tree is not clean."
-    echo "Commit or stash your changes before creating a release."
+    echo "Commit or stash your changes first."
     exit 1
 fi
 
@@ -46,6 +46,83 @@ echo "  Current version: $CURRENT_VERSION"
 echo "  New version:     $VERSION"
 echo
 
+# Find previous tag
+PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+
+if [ -n "$PREVIOUS_TAG" ]; then
+    RANGE="${PREVIOUS_TAG}..HEAD"
+    echo "Generating changelog from $PREVIOUS_TAG to HEAD"
+else
+    RANGE="HEAD"
+    echo "No previous tag found. Using full git history."
+fi
+
+# Collect commits
+FEATURES=$(git log "$RANGE" --pretty=format:"%s" | \
+    grep '^feat:' | sed 's/^feat:[[:space:]]*/- /' || true)
+
+FIXES=$(git log "$RANGE" --pretty=format:"%s" | \
+    grep '^fix:' | sed 's/^fix:[[:space:]]*/- /' || true)
+
+DOCS=$(git log "$RANGE" --pretty=format:"%s" | \
+    grep '^docs:' | sed 's/^docs:[[:space:]]*/- /' || true)
+
+CHANGES=$(git log "$RANGE" --pretty=format:"%s" | \
+    grep '^refactor:' | sed 's/^refactor:[[:space:]]*/- /' || true)
+
+PERFORMANCE=$(git log "$RANGE" --pretty=format:"%s" | \
+    grep '^perf:' | sed 's/^perf:[[:space:]]*/- /' || true)
+
+# Build changelog section
+CHANGELOG_SECTION="## [$VERSION] - $TODAY
+"
+
+if [ -n "$FEATURES" ]; then
+    CHANGELOG_SECTION+="
+### Added
+$FEATURES
+"
+fi
+
+if [ -n "$FIXES" ]; then
+    CHANGELOG_SECTION+="
+### Fixed
+$FIXES
+"
+fi
+
+if [ -n "$CHANGES" ]; then
+    CHANGELOG_SECTION+="
+### Changed
+$CHANGES
+"
+fi
+
+if [ -n "$PERFORMANCE" ]; then
+    CHANGELOG_SECTION+="
+### Performance
+$PERFORMANCE
+"
+fi
+
+if [ -n "$DOCS" ]; then
+    CHANGELOG_SECTION+="
+### Documentation
+$DOCS
+"
+fi
+
+# If nothing matched
+if [ -z "$FEATURES$FIXES$DOCS$CHANGES$PERFORMANCE" ]; then
+    echo "Error: no conventional commits found since previous release."
+    echo
+    echo "Expected commit messages such as:"
+    echo "  feat: add CRAM support"
+    echo "  fix: correct chromosome assignment"
+    echo "  docs: update README"
+    exit 1
+fi
+
 # Update version.txt
 printf '%s\n' "$VERSION" > version.txt
 
@@ -60,50 +137,34 @@ path = Path("CITATION.cff")
 lines = path.read_text().splitlines()
 
 found = False
-new_lines = []
+output = []
 
 for line in lines:
     if line.startswith("version:"):
-        new_lines.append(f'version: "{version}"')
+        output.append(f'version: "{version}"')
         found = True
     else:
-        new_lines.append(line)
+        output.append(line)
 
 if not found:
     raise SystemExit("Error: version field not found in CITATION.cff")
 
-path.write_text("\n".join(new_lines) + "\n")
+path.write_text("\n".join(output) + "\n")
 PY
 
-# Add a new CHANGELOG section after the title/introduction
-python3 - "$VERSION" "$TODAY" <<'PY'
+# Insert new changelog after title/introduction
+python3 - "$VERSION" "$TODAY" "$CHANGELOG_SECTION" <<'PY'
 import sys
 from pathlib import Path
 
 version = sys.argv[1]
-date = sys.argv[2]
+section = sys.argv[3]
 
 path = Path("CHANGELOG.md")
 text = path.read_text()
 
-header = f"## [{version}] - {date}"
-
-if header in text or f"## [{version}]" in text:
+if f"## [{version}]" in text:
     raise SystemExit(f"Error: version {version} already exists in CHANGELOG.md")
-
-section = f"""\
-## [{version}] - {date}
-
-### Added
-- TODO
-
-### Changed
-- TODO
-
-### Fixed
-- TODO
-
-"""
 
 lines = text.splitlines()
 
@@ -115,10 +176,7 @@ for i, line in enumerate(lines):
         break
 
 if insert_at is None:
-    if text.endswith("\n"):
-        text = text + "\n" + section
-    else:
-        text = text + "\n\n" + section
+    new_text = text.rstrip() + "\n\n" + section.rstrip() + "\n"
 else:
     new_lines = (
         lines[:insert_at]
@@ -126,28 +184,17 @@ else:
         + [""]
         + lines[insert_at:]
     )
-    text = "\n".join(new_lines) + "\n"
+    new_text = "\n".join(new_lines) + "\n"
 
-path.write_text(text)
+path.write_text(new_text)
 PY
 
 echo
-echo "Updated:"
-echo "  version.txt"
-echo "  CITATION.cff"
-echo "  CHANGELOG.md"
+echo "Generated CHANGELOG entry:"
 echo
-echo "Please edit CHANGELOG.md and replace TODO entries."
-echo
-read -r -p "Press Enter when CHANGELOG.md is ready, or Ctrl-C to cancel..."
+echo "$CHANGELOG_SECTION"
 
-# Check that TODOs were removed from the new section
-if grep -A 12 "## \[$VERSION\]" CHANGELOG.md | grep -q "TODO"; then
-    echo "Error: TODO entries still exist in the $VERSION changelog section."
-    exit 1
-fi
-
-git add version.txt CITATION.cff CHANGELOG.md
+git add version.txt CHANGELOG.md CITATION.cff
 
 git commit -m "chore: prepare release $TAG"
 
@@ -160,11 +207,9 @@ echo "Created:"
 echo "  commit: chore: prepare release $TAG"
 echo "  tag:    $TAG"
 echo
-echo "Review with:"
-echo
+echo "Review:"
 echo "  git show $TAG"
 echo
-echo "If everything looks good, push with:"
-echo
+echo "Then push:"
 echo "  git push origin main"
 echo "  git push origin $TAG"
