@@ -104,6 +104,7 @@ dependencies:
   - openssl=3.6.0=h26f9b46_0
   - paf2chain=0.1.1=h3ab6199_0
   - pango=1.56.3=h9ac818e_1
+  - pb-cpg-tools
   - pcre2=10.44=hc749103_2
   - perl=5.32.1=7_hd590300_perl5
   - pip
@@ -139,6 +140,8 @@ dependencies:
   - sed=4.9=h6688a6e_0
   - setuptools=80.9.0=pyhff2d567_0
   - bioconda::snakemake
+  - snakemake-executor-plugin-cluster-generic
+  - snakemake-executor-plugin-slurm
   - sysroot_linux-64=2.28=h4ee821c_8
   - threadpoolctl=3.6.0=pyhecae5ae_0
   - tk=8.6.13=noxft_hd72426e_102
