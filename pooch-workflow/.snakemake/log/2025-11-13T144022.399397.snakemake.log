@@ -1,0 +1,9 @@
+Assuming unrestricted shared filesystem usage.
+None
+host: cn0021
+Building DAG of jobs...
+MissingInputException in rule align in file "/vf/users/Phillippy/projects/poo_snakemake/main/Snakefile", line 38:
+Missing input files for rule align:
+    output: outdir=/vf/users/Phillippy/projects/poo_snakemake/test/output/alignments/None.pri.bam
+    affected files:
+        personalized_genome=/vf/users/Phillippy/projects/poo_snakemake/test/chr22.kolf.fa

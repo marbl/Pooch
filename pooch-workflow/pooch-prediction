@@ -1,0 +1,406 @@
+#! /bin/bash
+# check if snakemake is available
+if [[ "${1:-}" != "-h" && "${1:-}" != "--help" && "${1:-}" != "--helpme" ]] && ! command -v snakemake >/dev/null 2>&1; then
+    echo "Error: snakemake is not installed or not in PATH."
+    exit 1
+fi
+
+
+VERSION=$(cat "$(dirname "$0")/../version.txt")
+
+if [[ "$1" == "--version" ]]; then
+    echo "POOCH v${VERSION}"
+    exit 0
+fi
+
+# Default values
+REF_NAME="ref_name=CHM13"
+REF=""
+## personalized genome
+PERSONALIZED_GENOME=""
+HAP1_FA=""
+HAP2_FA=""
+HAP1=""
+HAP2=""
+CHROMS="chrom=chr1,chr2,chr3,chr4,chr5,chr6,chr7,chr8,chr9,chr10,chr11,chr12,chr13,chr14,chr15,chr16,chr17,chr18,chr19,chr20,chr21,chr22,chrX"
+## input reads
+FASTQ=""
+ALIGNER="aligner=Winnowmap2"
+## input BAM
+BAM=""
+## input methylation calling bed file
+METBED=""
+## input chain files
+CHAIN_HAP1=""
+CHAIN_HAP2=""
+## inpuyt methylation calling bed lifted over to reference
+MET_HAP1_REF=""
+MET_HAP2_REF=""
+## models and input for predictions
+MODELDIR="model_dir=$(dirname $(realpath $0))/model"
+FOFN=""
+SEX_MAP=""
+## ONT or HiFi
+PLATFORM=""
+## Output options
+OUTPUT_PREFIX="output_prefix=pooch_output"
+OUTDIR="output_dir=pooch_output"
+outdir_path="pooch_output"
+## running options
+THREADS_NUM="10"
+THREADS_CONFIG="threads=10"
+DRY_RUN=""
+TOUCH=""
+STEP=""
+OTHER_ARGS=""
+
+# Help function
+usage() {
+    cat << EOF
+Usage: $(basename "$0") [OPTIONS]
+
+Run the Pooch prediction workflow with Snakemake.
+
+Reference and output:
+    -r,  --reference FILE              Reference genome FASTA
+    -rn, --reference_name NAME         Reference name label
+                                        Default: CHM13
+    -o,  --output_prefix PREFIX        Output prefix
+                                        Default: pooch_output
+    -d,  --outdir DIR                  Output directory
+                                        Default: pooch_output
+
+Model and sample metadata:
+    -m,  --model_dir DIR               Directory containing trained Pooch models
+                                        Default: <pooch-workflow>/model
+    -fo, --fofn FILE                   Input FOFN, when required by selected workflow steps
+    -s,  --sex_map FILE                Tab-delimited sample sex map
+    --chroms LIST                      Comma-separated chromosomes
+                                        Default: chr1,chr2,...,chr22,chrX
+
+Genome input mode, choose at most one:
+    -pg, --personalized_genome FILE    Personalized diploid genome FASTA
+                                        Requires -h1/--hap1_name and -h2/--hap2_name
+    --hap1_fa FILE                     Pre-split haplotype 1 FASTA
+    --hap2_fa FILE                     Pre-split haplotype 2 FASTA
+                                        Requires both files plus haplotype names
+
+Haplotype labels:
+    -h1, --hap1_name NAME              Haplotype 1 label in the input data
+    -h2, --hap2_name NAME              Haplotype 2 label in the input data
+
+Sequence or methylation inputs, provide at least one path:
+    -f,   --fastq FILE                 FASTQ reads; requires genome input mode and platform
+    -b,   --bam FILE                   BAM alignments; requires platform
+    -met, --metbed FILE                Methylation BED file
+    -m1r, --met_hap1_on_ref FILE       Haplotype 1 methylation BED already lifted to reference
+    -m2r, --met_hap2_on_ref FILE       Haplotype 2 methylation BED already lifted to reference
+
+Optional precomputed files:
+    --chain_hap1 FILE                  Precomputed haplotype 1 chain file
+    --chain_hap2 FILE                  Precomputed haplotype 2 chain file
+
+Run options:
+    -p, --platform VALUE               Sequencing platform, required with FASTQ or BAM
+    -t, --threads INT                  Number of Snakemake cores
+                                        Default: 10
+    --aligner VALUE                    Winnowmap2 or Minimap2
+                                        Default: Winnowmap2
+    --step STEP                        Specific Snakemake target or rule to run
+    --dry-run                          Build the DAG without running jobs
+    --touch                            Mark outputs as up to date without running jobs
+    --snakeopts "ARGS"                 Extra arguments passed directly to Snakemake
+    -h, --help, --helpme               Show this help message and exit
+
+Examples:
+    $(basename "$0") -r chm13.fa -pg sample.fa -h1 maternal -h2 paternal \\
+        -p ONT -f reads.fastq.gz -s sex.tsv -o sampleA -d pooch_out
+
+    $(basename "$0") -r chm13.fa --hap1_fa sample.hap1.fa --hap2_fa sample.hap2.fa \\
+        -h1 maternal -h2 paternal -b sample.bam -p ONT -o sampleA -d pooch_out
+
+    $(basename "$0") -r chm13.fa -m1r hap1.ref.bed -m2r hap2.ref.bed \\
+        -o sampleA -d pooch_out --dry-run
+
+EOF
+    exit 0
+}
+
+# Parse arguments
+script_dir=$(dirname "$(readlink -f "$0")")
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help|--helpme)
+            usage
+            ;;
+        -m|--model_dir)
+            MODELDIR="model_dir=$(realpath "$2")"
+            shift 2
+            ;;
+        --chroms)
+            CHROMS="chrom=$2"
+            shift 2
+            ;;
+	    -fo|--fofn|--fofo)
+            FOFN="fofn=$(realpath "$2")"
+            shift 2
+	    ;;
+	-s|--sex_map)
+            SEX_MAP="sex_map=$(realpath "$2")"
+            shift 2
+            ;;
+        --chain_hap1)
+            CHAIN_HAP1="chain_hap1=$(realpath "$2")"
+            shift 2
+            ;;
+        --chain_hap2)
+            CHAIN_HAP2="chain_hap2=$(realpath "$2")"
+            shift 2
+            ;;
+        --hap1_fa)
+            HAP1_FA="hap1_fa=$(realpath "$2")"
+            shift 2
+            ;;
+        --hap2_fa)
+            HAP2_FA="hap2_fa=$(realpath "$2")"
+            shift 2
+            ;;
+        -b|--bam)
+            BAM="bam_input=$(realpath "$2")"
+            shift 2
+            ;;
+        -f|--fastq)
+            FASTQ="fastq_input=$2"
+            fastq_input=$2
+            shift 2
+            ;;
+        -met|--metbed)
+            METBED="metbed_input=$(realpath "$2")"
+            shift 2
+            ;;
+        -p|--platform)
+            PLATFORM="platform_input=$2"
+            shift 2
+            ;;
+        -r|--reference)
+            REF="reference_genome=$(realpath "$2")"
+            shift 2
+            ;;
+        -rn|--reference_name)
+            REF_NAME="ref_name=$2"
+            shift 2
+            ;;
+        -pg|--personalized_genome)
+            PERSONALIZED_GENOME="personalized_genome=$(realpath "$2")"
+            shift 2
+            ;;
+        -o|--output_prefix)
+            OUTPUT_PREFIX="output_prefix=$2"
+            shift 2
+            ;;
+        -t|--threads)
+            if [[ -z "${2:-}" || "$2" == -* ]]; then
+                echo "Error: --threads requires a positive integer value"
+                exit 1
+            fi
+            if ! [[ "$2" =~ ^[1-9][0-9]*$ ]]; then
+                echo "Error: --threads must be a positive integer. Provided: $2"
+                exit 1
+            fi
+            THREADS_NUM="$2"
+            THREADS_CONFIG="threads=$2"
+            shift 2
+            ;;
+        -d|--outdir)
+            OUTDIR="output_dir=$(realpath "$2")"
+            outdir_path=$(realpath "$2")
+            shift 2
+	    ;;
+        -h1|--hap1_name)
+            HAP1_NAME="hap1_name=$2"
+            shift 2
+            ;;
+        -h2|--hap2_name)
+            HAP2_NAME="hap2_name=$2"
+            shift 2
+            ;;
+        -m1r|--met_hap1_on_ref)
+	    MET_HAP1_ON_REF="met_hap1_on_reference=$(realpath $2)"
+            shift 2
+            ;;
+        -m2r|--met_hap2_on_ref)
+	    MET_HAP2_ON_REF="met_hap2_on_reference=$(realpath $2)"
+            shift 2
+            ;;
+        --aligner)
+            ALIGNER="aligner=$2"
+            shift 2
+            ;;
+        --touch)
+            TOUCH="--touch"
+            shift
+            ;;
+        --dry-run)
+            DRY_RUN="-n"
+            shift
+            ;;
+        --step)
+            STEP="$2"
+            shift 2
+            ;;
+        --snakeopts)
+            OTHER_ARGS="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+for var in ; do
+    [[ -n "${!var}" ]] && echo "$var=${!var}"
+done
+
+
+# Check required arguments
+required_vars=("MODELDIR" "OUTDIR" "OUTPUT_PREFIX")
+for var_name in "${required_vars[@]}"; do
+    if [[ "${!var_name}" == "" ]]; then
+        echo "Error: --${var_name,,} is required"
+        exit 1
+    fi
+done
+
+if [[ -z "$outdir_path" ]]; then
+    echo "Error: --outdir is required"
+    exit 1
+fi
+
+# Exactly one mode is allowed:
+#   1) personalized genome mode: --personalized_genome
+#   2) split fasta mode: --hap1_fa + --hap2_fa
+has_personalized=0
+has_split_fa=0
+
+if [[ -n "$PERSONALIZED_GENOME" ]]; then
+    if [[ ! -n "$HAP1_NAME" || ! -n "$HAP2_NAME" ]]; then
+        echo "Error: --personalized_genome must be used with --hap1_name and --hap2_name"
+        exit 1
+    fi
+    has_personalized=1
+fi
+if [[ -n "$HAP1_FA" && -n "$HAP2_FA" ]]; then
+    has_split_fa=1
+fi
+
+if [[ $has_personalized -eq 1 && $has_split_fa -eq 1 ]]; then
+    echo "Error: provide either --personalized_genome OR (--hap1_fa and --hap2_fa), not both."
+    exit 1
+fi
+
+# Check if --metbed is provied
+
+if [[ -n "$METBED" ]] && [[ $has_personalized -eq 0 && $has_split_fa -eq 0 ]]; then
+    echo "Error: --personalized_genome or (--hap1_fa and --hap2_fa) is required."
+    exit 1
+fi
+
+
+
+if [[ -n "$HAP1_FA" && -z "$HAP2_FA" ]] || [[ -z "$HAP1_FA" && -n "$HAP2_FA" ]]; then
+    echo "Error: --hap1_fa and --hap2_fa must be provided together."
+    exit 1
+fi
+
+if [[ $has_split_fa -eq 1 ]] && [[ -z "$HAP1_NAME" || -z "$HAP2_NAME" ]]; then
+    echo "Error: split-FA mode requires --hap1_name and --hap2_name so methylation can be separated by haplotype label."
+    exit 1
+fi
+
+
+
+
+if [[ -n "$FASTQ" && -z "$BAM" && ($has_personalized -eq 0 && $has_split_fa -eq 0 )]]; then
+    echo "Error: FASTQ alignment requires --personalized_genome or --hap1_fa and --hap2_fa."
+    exit 1
+fi
+
+# check the aligner should be either Winnowmap2 or Minimap2
+if [[ "$ALIGNER" != "aligner=Winnowmap2" && "$ALIGNER" != "aligner=Minimap2" ]]; then
+    echo "Error: --aligner should be either Winnowmap2 or Minimap2. Provided: "--"$ALIGNER"
+    exit 1
+fi
+
+if [[ -z "$BAM" && -z "$FASTQ" && -z "$METBED" && ( -z "$MET_HAP1_ON_REF" || -z "$MET_HAP2_ON_REF" ) ]]; then
+    echo "Error: --bam, --fastq, --metbed, or both --met_hap1_on_ref and --met_hap2_on_ref are required"
+    exit 1
+fi
+
+if [[ ( -n "$FASTQ" || -n "$BAM" ) && -z "$PLATFORM" ]]; then
+    echo "Error: --platform is required when --fastq or --bam is provided."
+    exit 1
+fi
+
+# check methylation tags in fastq file
+#if [[ -n "$FASTQ" ]]; then
+    #echo "Checking fastq headers for MM tag..."
+    #bash $script_dir/workflow/scripts/00.check_fastq_header.sh "$fastq_input"
+#fi
+
+mkdir -p "$outdir_path"
+
+# Make cute logo
+
+cat <<EOF
+
+ / \__          ┌─────────────────────────────────────┐
+(    @\___      │               POOCH                 │
+ /         O    │ Parent Of Origin Classification     │
+/   (_____/     │          Of Haplotypes              │
+/_____/   U     └─────────────────────────────────────┘
+
+Version: ${VERSION:-dev}
+Tracking parental origin of haplotypes...
+Sniffing inheritance trails...
+
+EOF
+
+CMD="snakemake -s $script_dir/Snakefile-prediction \
+    $DRY_RUN \
+    $TOUCH \
+    $STEP \
+    --cores $THREADS_NUM \
+    $OTHER_ARGS \
+    --config \
+    $THREADS_CONFIG \
+    $REF \
+    $PERSONALIZED_GENOME \
+    $HAP1_NAME \
+    $HAP2_NAME \
+    $HAP1_FA \
+    $HAP2_FA \
+    $CHAIN_HAP1 \
+    $CHAIN_HAP2 \
+    $MODELDIR \
+    $FASTQ \
+    $PLATFORM \
+    $BAM \
+    $METBED \
+    $MET_HAP1_ON_REF \
+    $MET_HAP2_ON_REF \
+    $ALIGNER \
+    $OUTPUT_PREFIX \
+    $SEX_MAP \
+    $FOFN \
+    $REF_NAME \
+    $CHROMS \
+    $OUTDIR \
+    --directory $outdir_path
+    "
+
+echo -e "\n"
+
+eval $CMD

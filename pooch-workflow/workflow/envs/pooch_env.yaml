@@ -1,0 +1,17 @@
+name: poo
+channels:
+  - bioconda
+dependencies:
+  - bioconda::bioconductor-maftools
+  - bx-python
+  - bioconda::k8
+  - bioconda::meryl
+  - bioconda::ont-modkit
+  - bioconda::paf2chain
+  - bioconda::rustybam
+  - bioconda::samtools
+  - bioconda::ucsc-liftover
+  - bioconda::vcf2maf
+  - bioconda::winnowmap
+
+prefix: "/gpfs/gsfs11/users/kimj75/conda/envs/poo"

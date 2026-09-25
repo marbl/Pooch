@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pofo_tools"
+version = "0.1.0a"
+description = "Parent of Origin (PofO) Tools"
+authors = [{ name = "Brandon Pickett", email = "pickettbd@nih.gov" }]
+requires-python = ">=3.7"
+dependencies =	[
+					"numpy",
+					"pandas",
+					"scikit-learn",
+					"matplotlib",
+					"seaborn",
+					"scipy"
+				]

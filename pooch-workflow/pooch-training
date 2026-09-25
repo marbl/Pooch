@@ -1,0 +1,200 @@
+#! /bin/bash
+# check if snakemake is available
+if ! command -v snakemake >/dev/null 2>&1; then
+    echo "Error: snakemake is not installed or not in PATH."
+    exit 1
+fi
+
+VERSION=$(cat "$(dirname "$0")/../version.txt")
+
+if [[ "$1" == "--version" ]]; then
+    echo "POOCH v${VERSION}"
+    exit 0
+fi
+
+# Default values
+REF_NAME="ref_name=CHM13"
+REF=""
+# INPUTS
+FOFN=""
+SEX_MAP=""
+MISSING_RATE="missing_rate=5.0"
+# output
+OUTPUT_PREFIX="output_prefix=pooch_training_output"
+OUTDIR="output_dir=pooch_training_output"
+outdir_path="pooch_training_output"
+CHROMS="chrom=chr1,chr2,chr3,chr4,chr5,chr6,chr7,chr8,chr9,chr10,chr11,chr12,chr13,chr14,chr15,chr16,chr17,chr18,chr19,chr20,chr21,chr22,chrX"
+SEXCHROM="sexchrom=chrX"
+## running options
+THREADS_NUM="10"
+THREADS_CONFIG="threads=10"
+DRY_RUN=""
+TOUCH=""
+OTHER_ARGS=""
+
+# Help function
+usage() {
+    cat << EOF
+Usage: $(basename "$0") [OPTIONS]
+
+Run the Pooch training workflow with Snakemake.
+
+Required arguments:
+    -fo, --fofn FILE              Input FOFN listing training methylation files
+    -s,  --sex_map FILE           Tab-delimited sample sex map
+
+Optional inputs:
+    --chroms LIST                 Comma-separated chromosomes to train
+                                  Default: chr1,chr2,...,chr22,chrX
+    --sexchrom CHROM              Sex chromosome to remove for all-male cohorts
+                                  Default: chrX
+
+Output options:
+    -o, --output_prefix PREFIX    Output prefix used for final summary files
+                                  Default: pooch_training_output
+    -d, --outdir DIR              Output directory
+                                  Default: pooch_training_output
+
+Training options:
+    -m, --missing_rate FLOAT      Maximum allowed missing rate percentage
+                                  Default: 5.0
+    -t, --threads INT             Number of Snakemake cores to use
+                                  Default: 10
+
+Snakemake options:
+    --dry-run                     Build the DAG without running jobs
+    --touch                       Mark outputs as up to date without running jobs
+    --snakeopts "ARGS"            Extra arguments passed directly to Snakemake
+
+General options:
+    -h, --help, --helpme          Show this help message and exit
+
+Examples:
+    $(basename "$0") --fofn input.fofn --sex_map sex.txt
+
+    $(basename "$0") --fofn input.fofn --sex_map sex.txt \
+        --chroms chr1,chr2,chr3 --missing_rate 5 --threads 24
+
+    $(basename "$0") --fofn input.fofn --sex_map sex.txt \
+        --dry-run --snakeopts "--rerun-incomplete --latency-wait 30"
+
+EOF
+    exit 0
+}
+
+# Parse arguments
+script_dir=$(dirname "$(readlink -f "$0")")
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help|--helpme)
+            usage
+            ;;
+    	-fo|--fofn)
+            FOFN="fofn=$(realpath "$2")"
+            shift 2
+	    ;;
+        --chroms)
+            CHROMS="chrom=$2"
+            shift 2
+            ;;
+	    -s|--sex_map)
+            SEX_MAP="sex_map=$(realpath "$2")"
+            shift 2
+            ;;
+        -m|--missing_rate)
+            MISSING_RATE="missing_rate=$2"
+            shift 2
+            ;;
+        --sexchrom)
+            SEXCHROM="sexchrom=$2"
+            shift 2
+            ;;
+        -o|--output_prefix)
+            OUTPUT_PREFIX="output_prefix=$2"
+            shift 2
+            ;;
+        -t|--threads)
+            if [[ -z "${2:-}" || "$2" == -* ]]; then
+                echo "Error: --threads requires a positive integer value"
+                exit 1
+            fi
+            if ! [[ "$2" =~ ^[1-9][0-9]*$ ]]; then
+                echo "Error: --threads must be a positive integer. Provided: $2"
+                exit 1
+            fi
+            THREADS_NUM="$2"
+            THREADS_CONFIG="threads=$2"
+            shift 2
+            ;;
+        -d|--outdir)
+            OUTDIR="output_dir=$(realpath "$2")"
+            outdir_path=$(realpath "$2")
+            shift 2
+	    ;;
+        --touch)
+            TOUCH="--touch"
+            shift
+            ;;
+        --dry-run)
+            DRY_RUN="-n"
+            shift
+            ;;
+        --snakeopts)
+            OTHER_ARGS="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# required arguments check
+for var in FOFN SEX_MAP; do
+    if [[ -z "${!var}" ]]; then
+        echo "Error: Required argument $var is not set."
+        exit 1
+    fi
+done
+
+
+mkdir -p "$outdir_path"
+
+# Make cute logo
+
+cat <<EOF
+
+ / \__          ┌─────────────────────────────────────┐
+(    @\___      │           POOCH TRAINING            │
+ /         O    │ Parent Of Origin Classification     │
+/   (_____/     │          Of Haplotypes              │
+/_____/   U     └─────────────────────────────────────┘
+
+Version: ${VERSION:-dev}
+Tracking parental origin of haplotypes...
+Sniffing inheritance trails...
+
+EOF
+
+CMD="snakemake -s $script_dir/Snakefile-training \
+    $DRY_RUN \
+    $TOUCH \
+    --cores $THREADS_NUM \
+    $OTHER_ARGS \
+    --config \
+    $THREADS_CONFIG \
+    $FOFN \
+    $OUTPUT_PREFIX \
+    $OUTDIR \
+    $SEX_MAP \
+    $CHROMS \
+    $MISSING_RATE \
+    $SEXCHROM \
+    --directory $outdir_path \
+    "
+
+echo -e "\n"
+
+eval $CMD

@@ -1,0 +1,108 @@
+Assuming unrestricted shared filesystem usage.
+None
+host: cn0003
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 10
+Rules claiming more threads will be scaled down.
+Job stats:
+job                     count
+--------------------  -------
+all                         1
+call_methylation            1
+liftover_methylation        1
+make_chain                  1
+split_fa                    1
+total                       5
+
+Select jobs to execute...
+Execute 2 jobs...
+[Thu Sep  4 11:11:06 2025]
+localrule call_methylation:
+    input: resources/alignments.bam, resources/personalized_genome.fasta
+    output: output/methylation/output.pri.meth.filt.bed
+    jobid: 2
+    reason: Missing output files: output/methylation/output.pri.meth.filt.bed
+    resources: tmpdir=/tmp
+[Thu Sep  4 11:11:06 2025]
+localrule split_fa:
+    input: resources/personalized_genome.fasta
+    output: output/chain/output.hap1.fa, output/chain/output.hap2.fa
+    jobid: 4
+    reason: Missing output files: output/chain/output.hap1.fa, output/chain/output.hap2.fa
+    resources: tmpdir=/tmp
+RuleException:
+CalledProcessError in file "/vf/users/Phillippy/projects/poo_snakemake/main/Snakefile", line 112:
+Command 'set -euo pipefail;  
+        echo "Calling methylation for output using ONT"
+        if [ "ONT" = "ONT" ]; then
+            sh scripts/01.call_methylation.ONT.sh resources/alignments.bam output output 1
+        else
+            sh scripts/01.call_methylation.HiFi.sh resources/alignments.bam resources/personalized_genome.fasta output output 1 ## NEED TO FIX
+        fi' returned non-zero exit status 127.
+[Thu Sep  4 11:11:06 2025]
+Error in rule call_methylation:
+    message: None
+    jobid: 2
+    input: resources/alignments.bam, resources/personalized_genome.fasta
+    output: output/methylation/output.pri.meth.filt.bed
+    shell:
+        
+        echo "Calling methylation for output using ONT"
+        if [ "ONT" = "ONT" ]; then
+            sh scripts/01.call_methylation.ONT.sh resources/alignments.bam output output 1
+        else
+            sh scripts/01.call_methylation.HiFi.sh resources/alignments.bam resources/personalized_genome.fasta output output 1 ## NEED TO FIX
+        fi
+        
+        (command exited with non-zero exit code)
+RuleException:
+CalledProcessError in file "/vf/users/Phillippy/projects/poo_snakemake/main/Snakefile", line 68:
+Command 'set -euo pipefail;  
+        echo "Splitting personalized genome resources/personalized_genome.fasta into hap1 and hap2"
+        sh scripts/02.splitFa.sh resources/personalized_genome.fasta output hap2 hap2 output' returned non-zero exit status 127.
+[Thu Sep  4 11:11:06 2025]
+Error in rule split_fa:
+    message: None
+    jobid: 4
+    input: resources/personalized_genome.fasta
+    output: output/chain/output.hap1.fa, output/chain/output.hap2.fa
+    shell:
+        
+        echo "Splitting personalized genome resources/personalized_genome.fasta into hap1 and hap2"
+        sh scripts/02.splitFa.sh resources/personalized_genome.fasta output hap2 hap2 output
+        
+        (command exited with non-zero exit code)
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look below for error messages
+[Thu Sep  4 11:11:06 2025]
+Error in rule call_methylation:
+    message: None
+    jobid: 2
+    input: resources/alignments.bam, resources/personalized_genome.fasta
+    output: output/methylation/output.pri.meth.filt.bed
+    shell:
+        
+        echo "Calling methylation for output using ONT"
+        if [ "ONT" = "ONT" ]; then
+            sh scripts/01.call_methylation.ONT.sh resources/alignments.bam output output 1
+        else
+            sh scripts/01.call_methylation.HiFi.sh resources/alignments.bam resources/personalized_genome.fasta output output 1 ## NEED TO FIX
+        fi
+        
+        (command exited with non-zero exit code)
+[Thu Sep  4 11:11:06 2025]
+Error in rule split_fa:
+    message: None
+    jobid: 4
+    input: resources/personalized_genome.fasta
+    output: output/chain/output.hap1.fa, output/chain/output.hap2.fa
+    shell:
+        
+        echo "Splitting personalized genome resources/personalized_genome.fasta into hap1 and hap2"
+        sh scripts/02.splitFa.sh resources/personalized_genome.fasta output hap2 hap2 output
+        
+        (command exited with non-zero exit code)
+Complete log(s): /vf/users/Phillippy/projects/poo_snakemake/main/.snakemake/log/2025-09-04T111059.798079.snakemake.log
+WorkflowError:
+At least one job did not complete successfully.

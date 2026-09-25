@@ -1,0 +1,522 @@
+# INPUTS
+REF 				= 	config.get("reference_genome", "")
+REF_NAME 			= 	config.get("ref_name", "")
+PERSONALIZEDGENOME_DIP 		= 	config.get("personalized_genome", "")
+PERSONALIZEDGENOME_HAP1		= 	config.get("hap1_fa", "")
+PERSONALIZEDGENOME_HAP2		= 	config.get("hap2_fa", "")
+HAP1_NAME			= 	config.get("hap1_name", "")
+HAP2_NAME 			= 	config.get("hap2_name", "")
+CHAIN_HAP1			= 	config.get("chain_hap1", "")
+CHAIN_HAP2			= 	config.get("chain_hap2", "")
+FASTQ 				= 	config.get("fastq_input", "")
+PLATFORM 			= 	config.get("platform_input", "")
+BAM 				= 	config.get("bam_input", "")
+MET_ON_PERSONALIZEDGENOME 	= 	config.get("metbed_input", "")
+MET_HAP1_REFERENCE_BED		=	config.get("met_hap1_on_reference", "")
+MET_HAP2_REFERENCE_BED		=	config.get("met_hap2_on_reference", "")
+SAMPLE 				= 	config.get("output_prefix", "")
+OUTDIR 				= 	config.get("output_dir", "")
+THREADS 			= 	config.get("threads", "")
+MAPPER 				= 	config.get("aligner", "Winnowmap2")
+MODELS 				= 	config.get("model_dir", "")
+FOFN 				= 	config.get("fofn","")
+SEX 				= 	config.get("sex_map","")
+CHROMS              =   config.get("chrom","")
+
+import os
+FASTQ_FILES = ",".join(FASTQ.split()) if FASTQ else ""
+POFO_TOOLS_DIR = workflow.basedir + "/../pofo_tools"
+SCRIPTS_DIR = workflow.basedir + "/workflow/scripts"
+
+# DEFAULT OUTPUT NAMES
+DEFAULT_HAP1_FA 		= 	f"{OUTDIR}/chain/{SAMPLE}.hap1.fa"
+DEFAULT_HAP2_FA			= 	f"{OUTDIR}/chain/{SAMPLE}.hap2.fa"
+DEFAULT_CHAIN_HAP1 		= 	f"{OUTDIR}/chain/{REF_NAME}_to_{SAMPLE}.hap1.inverted.chain"
+DEFAULT_CHAIN_HAP2 		= 	f"{OUTDIR}/chain/{REF_NAME}_to_{SAMPLE}.hap2.inverted.chain"
+DEFAULT_PERSONALIZEDGENOME_DIP 	= 	f"{OUTDIR}/alignment/{SAMPLE}.diploid.fa"
+DEFAULT_MET_ON_PERSONALIZEDGENOME = 	f"{OUTDIR}/methylation/{SAMPLE}.pri.meth.filt.bed"
+DEFAULT_MET_HAP1_REFERENCE_BED 	= 	f"{OUTDIR}/methylation/{SAMPLE}_hap1.meth.{REF_NAME}.bed"
+DEFAULT_MET_HAP2_REFERENCE_BED 	= 	f"{OUTDIR}/methylation/{SAMPLE}_hap2.meth.{REF_NAME}.bed"
+DEFAULT_FOFN 			= 	f"{OUTDIR}/prediction/{SAMPLE}.fofn" 
+DEFAULT_SEX 			= 	f"{OUTDIR}/prediction/{SAMPLE}.sex.txt"
+
+# REPLACE THE DEFAULT FILE NAMES WITH INPUTS
+HAP1_FA_PATH 			= 	PERSONALIZEDGENOME_HAP1 if PERSONALIZEDGENOME_HAP1 else DEFAULT_HAP1_FA
+HAP2_FA_PATH 			= 	PERSONALIZEDGENOME_HAP2 if PERSONALIZEDGENOME_HAP2 else DEFAULT_HAP2_FA
+PERSONALIZEDGENOME_DIP_PATH 	= 	PERSONALIZEDGENOME_DIP if PERSONALIZEDGENOME_DIP else DEFAULT_PERSONALIZEDGENOME_DIP
+CHAIN_HAP1_PATH 		= 	CHAIN_HAP1 if CHAIN_HAP1 else DEFAULT_CHAIN_HAP1
+CHAIN_HAP2_PATH 		= 	CHAIN_HAP2 if CHAIN_HAP2 else DEFAULT_CHAIN_HAP2
+MET_ON_PERSONALIZEDGENOME_PATH 	=	MET_ON_PERSONALIZEDGENOME if MET_ON_PERSONALIZEDGENOME else DEFAULT_MET_ON_PERSONALIZEDGENOME
+MET_HAP1_REFERENCE_BED_PATH 	= 	MET_HAP1_REFERENCE_BED if MET_HAP1_REFERENCE_BED else DEFAULT_MET_HAP1_REFERENCE_BED
+MET_HAP2_REFERENCE_BED_PATH 	= 	MET_HAP2_REFERENCE_BED if MET_HAP2_REFERENCE_BED else DEFAULT_MET_HAP2_REFERENCE_BED
+FOFN_PATH 			= 	FOFN if FOFN else DEFAULT_FOFN
+SEX_PATH 			= 	SEX if SEX else DEFAULT_SEX
+
+########################################
+# Step 0: Check input parameters
+########################################
+print(f"Scripts directory	: {SCRIPTS_DIR}")
+print(f"Reference genome	: {REF}")
+print(f"Personalized genome	: {PERSONALIZEDGENOME_DIP}")
+print(f"Hap1 name		: {HAP1_NAME}")
+print(f"Hap2 name		: {HAP2_NAME}")
+print(f"FASTQ files		: {FASTQ_FILES}")
+print(f"Platform		: {PLATFORM}")
+print(f"Output prefix		: {SAMPLE}")
+print(f"Output directory	: {OUTDIR}")
+print(f"Reference name		: {REF_NAME}")
+print(f"Threads			: {THREADS}")
+print(f"Aligner			: {MAPPER}")
+print(f"Model directory		: {MODELS}")
+print(f"Provided hap1 fasta	: {PERSONALIZEDGENOME_HAP1}")
+print(f"Provided hap2 fasta	: {PERSONALIZEDGENOME_HAP2}")
+print(f"MET_HAP1_REFERENCE_BED	: {MET_HAP1_REFERENCE_BED}")
+print(f"MET_HAP2_REFERENCE_BED  : {MET_HAP2_REFERENCE_BED}")
+
+
+chroms = CHROMS.str.split(",")
+
+# if bam file is provided, skip alignment step
+if BAM:
+    print(f"BAM file provided: {BAM}. Skipping alignment step.")
+# if matbed file is provided, skip methylation calling step
+if MET_ON_PERSONALIZEDGENOME:
+    print(f"Methylation bed file provided: {MET_ON_PERSONALIZEDGENOME_PATH}. Skipping methylation calling step.")
+if CHAIN_HAP1 and CHAIN_HAP2:
+    print(f"Chain files provided: {CHAIN_HAP1}, {CHAIN_HAP2}. Skipping chain generation step.")
+if PERSONALIZEDGENOME_HAP1 and PERSONALIZEDGENOME_HAP2:
+    print(f"Split fasta files provided: {PERSONALIZEDGENOME_HAP1}, {PERSONALIZEDGENOME_HAP2}. Skipping split fasta step.")
+
+rule all:
+    input:
+#        f"{OUTDIR}/alignments/{SAMPLE}.step0_methylation_tag_check.done",
+#        f"{OUTDIR}/methylation/{SAMPLE}_hap1.meth.{REF_NAME}.bed",
+#        f"{OUTDIR}/methylation/{SAMPLE}_hap2.meth.{REF_NAME}.bed",
+#        f"{OUTDIR}/chain/{REF_NAME}_to_{SAMPLE}.chromAssign.filtered.txt",
+#        f"{OUTDIR}/prediction/{SAMPLE}.chroms.txt",
+        f"{OUTDIR}/prediction/{SAMPLE}.predict.out"
+
+# ########################################
+# Step 0: Data Check (FASTQ/BAM/Methylation bed)
+########################################
+rule step00_methylation_tag_check:
+    output:
+        check=f"{OUTDIR}/alignments/{SAMPLE}.step0_methylation_tag_check.done"
+    log : 
+        f"{OUTDIR}/alignments/{SAMPLE}.step0_methylation_tag_check.log"
+    params:
+        sample = SAMPLE,
+        mainDir	= OUTDIR,
+        fastqs = FASTQ_FILES,
+        bam = BAM,
+        metbed = MET_ON_PERSONALIZEDGENOME,
+        met_hap1_ref = MET_HAP1_REFERENCE_BED,
+        met_hap2_ref = MET_HAP2_REFERENCE_BED
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 10000
+    threads: THREADS
+    shell:
+        """
+        exec > >(tee -a {log}) 2>&1
+        mkdir -p {params.mainDir}/alignments
+
+        if [ ! -z "{params.fastqs}" ]; then
+            echo "Checking FASTQ headers for {params.sample}"
+            bash {SCRIPTS_DIR}/00.check_fastq_header.sh "{params.fastqs}" {params.mainDir} {params.sample}
+
+        elif [ ! -z "{params.bam}" ]; then
+            echo "Checking BAM methylation tags for {params.sample}"
+            bash {SCRIPTS_DIR}/00.check_bam_tags.sh {params.bam} {params.mainDir} {params.sample}
+
+        elif [ ! -z "{params.metbed}" ]; then
+            echo "Methylation bed file provided: {params.metbed}. Skipping methylation tag check."
+            touch {output.check}
+        
+        elif [ -n "{params.met_hap1_ref}" ] && [ -n "{params.met_hap2_ref}" ]; then
+            echo "Methylation bed lifted over to CHM13 are provided. Skipping methylation tag check."
+            touch {output.check}
+        else
+            echo "No FASTQ, BAM, or methylation bed file provided. Cannot check methylation tags. Please provide at least one of these inputs."
+            exit 1
+        fi
+        """
+
+## if PERSONALIZEDGENOME_HAP1 and PERSONALIZEDGENOME_HAP2 are provided, Generate PERSONALIZEDGENOME_DIP from them, otherwise use the provided PERSONALIZEDGENOME_DIP
+# ########################################
+# Step 1: Generate personalized diploid genome
+########################################
+rule step01_generate_personalized_genome:
+    input:
+        hap1=HAP1_FA_PATH,
+        hap2=HAP2_FA_PATH,
+        check=f"{OUTDIR}/alignments/{SAMPLE}.step0_methylation_tag_check.done"
+    output:
+        diploid=DEFAULT_PERSONALIZEDGENOME_DIP
+    log:
+        f"{OUTDIR}/chain/{SAMPLE}.generate_personalized_genome.log"
+    params:
+        sample=SAMPLE,
+        mainDir=OUTDIR,
+        hap1_name=HAP1_NAME,
+        hap2_name=HAP2_NAME
+    shell:
+        """
+        exec > >(tee -a {log}) 2>&1
+        echo "Generating diploid personalized genome from {input.hap1} and {input.hap2}"
+        mkdir -p {OUTDIR}/alignment
+        cat {input.hap1} {input.hap2} > {output.diploid}
+        """
+
+
+# ########################################
+# Step 2: Alignment & merge & sorting
+########################################
+rule step02_align:
+    input:
+        reference=PERSONALIZEDGENOME_DIP_PATH,
+        check=f"{OUTDIR}/alignments/{SAMPLE}.step0_methylation_tag_check.done"
+    output:
+        bam=f"{OUTDIR}/alignments/{SAMPLE}.pri.bam"
+    log:
+        f"{OUTDIR}/alignments/{SAMPLE}.align.log"
+    params:
+        platform=PLATFORM,
+        sample=SAMPLE,
+        mainDir=OUTDIR,
+        fastqs=FASTQ_FILES,
+        threads=THREADS,
+        mapper=MAPPER
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * THREADS * 1000
+    threads: THREADS
+    shell:
+        """
+        # exit if BAM is existed
+        if [ -f "{output.bam}" ]; then
+            echo "BAM file {output.bam} already exists. Skipping alignment step."
+            echo -e "This might be because the BAM file was provided as input or the alignment step has already been completed."
+            echo -e "But snakemake was trying to run the alignment step again. Please check your input parameters and output directory."
+            echo -e "If you want to rerun the alignment step, please remove the existing BAM file and rerun snakemake."
+            echo -e "If you don't want to rerun the alignment step, please provide the existing BAM file as input and rerun snakemake or touch the output BAM file to skip the alignment step."
+            echo -e "\n"
+            exit 0
+        fi
+        
+        echo "Aligning {params.sample} reads to {input.reference} using {params.mapper}"
+        if [ "{params.mapper}" = "Winnowmap2" ]; then
+            TMPDIR={resources.tmpdir} bash {SCRIPTS_DIR}/01.align_winnowmap.sh {input.reference} {params.mainDir} {params.sample} {params.fastqs} {params.platform} {params.threads} 2>&1 | tee {log}
+            exit ${{PIPESTATUS[0]}}
+        elif [ "{params.mapper}" = "Minimap2" ]; then
+            TMPDIR={resources.tmpdir} bash {SCRIPTS_DIR}/01.align_minimap2.sh {input.reference} {params.mainDir} {params.sample} {params.fastqs} {params.platform} {params.threads} 2>&1 | tee {log}
+            exit ${{PIPESTATUS[0]}}
+        else
+            echo "Unsupported platform: {params.mapper}. Please specify Winnowmap2 or Minimap2." | tee {log}
+            exit 1
+        fi
+        """
+
+########################################
+# Step 3: Make chain file
+########################################
+rule step03_make_chain:
+#    input:
+#        reference=REF
+    output:
+        chain_hap1_inv=CHAIN_HAP1_PATH,
+        chain_hap2_inv=CHAIN_HAP2_PATH,
+    log:
+        f"{OUTDIR}/chain/{SAMPLE}.makeChain.log"
+    params:
+        sample=SAMPLE,
+        reference=REF,
+        mainDir=f"{OUTDIR}/chain",
+        REF_NAME=REF_NAME,
+        hap1_fa_input=HAP1_FA_PATH,
+        hap2_fa_input=HAP2_FA_PATH,
+        HAP1_NAME=HAP1_NAME,
+        HAP2_NAME=HAP2_NAME,
+        personalized=PERSONALIZEDGENOME_DIP_PATH
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 100000
+    threads: THREADS
+    shell:
+        """
+        exec > >(tee -a {log}) 2>&1
+        if [[ ! -z "{PERSONALIZEDGENOME_HAP1}" ]] && [[ ! -z "{PERSONALIZEDGENOME_HAP2}" ]]; then
+            echo "Using provided split fasta files: {params.hap1_fa_input}, {params.hap2_fa_input}"
+            hap1_fa="{params.hap1_fa_input}"
+            hap2_fa="{params.hap2_fa_input}"
+        else
+            echo "Splitting personalized genome {params.personalized} into hap1 and hap2"
+            sh {SCRIPTS_DIR}/02.splitFa.sh {params.personalized} {params.mainDir} {params.HAP1_NAME} {params.HAP2_NAME} {params.sample}
+            hap1_fa="{params.mainDir}/{params.sample}.hap1.fa"
+            hap2_fa="{params.mainDir}/{params.sample}.hap2.fa"
+        fi
+        sh {SCRIPTS_DIR}/03.make_chain_personal_reference.sh {input.reference} "$hap1_fa" {params.mainDir} {params.REF_NAME} {params.sample}.hap1 
+        sh {SCRIPTS_DIR}/03.make_chain_personal_reference.sh {input.reference} "$hap2_fa" {params.mainDir} {params.REF_NAME} {params.sample}.hap2
+        """
+
+########################################
+# Step 4: Call methylation
+########################################
+rule step04_call_methylation:
+    input:
+        bam=lambda wildcards: BAM if BAM else f"{OUTDIR}/alignments/{SAMPLE}.pri.bam",
+        personalized=PERSONALIZEDGENOME_DIP_PATH
+    output:
+        matbed=f"{OUTDIR}/methylation/{SAMPLE}.pri.meth.filt.bed"
+    params:
+        sample=SAMPLE,
+        mainDir=OUTDIR,
+        platform=PLATFORM,
+        threads=THREADS
+    log:
+        f"{OUTDIR}/methylation/{SAMPLE}.step04_call_methylation.log"
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 10000
+    threads: THREADS
+    shell:
+        """
+        exec > >(tee -a {log}) 2>&1
+        echo "Calling methylation for {params.sample} using {params.platform}"
+        if [ "{params.platform}" = "ONT" ]; then
+            sh {SCRIPTS_DIR}/04.call_methylation.ONT.sh {input.bam} {params.mainDir} {params.sample} {params.threads} {input.personalized}
+        elif [ "{params.platform}" = "HiFi" ] || [ "{params.platform}" = "PACBIO" ]; then
+            sh {SCRIPTS_DIR}/04.call_methylation.HiFi.sh {input.bam} {params.mainDir} {params.sample} {params.threads}
+        else
+            echo "Unsupported platform: {params.platform}. Please specify ONT, HiFi, or PACBIO."
+            exit 1
+        fi
+        """
+
+########################################
+# Step 5: Liftover methylation (per haplotype)
+########################################
+rule step05_liftover_hap1:
+    input:
+        matbed=lambda wildcards: MATBED if MATBED else f"{OUTDIR}/methylation/{SAMPLE}.pri.meth.filt.bed",
+        chain=lambda wildcards: CHAIN_HAP1_PATH
+    output:
+        ref_bed=f"{OUTDIR}/methylation/{SAMPLE}_hap1.meth.{REF_NAME}.bed"
+    params:
+        sample=SAMPLE,
+        mainDir=OUTDIR,
+        hap_num="hap1"
+    log:
+        f"{OUTDIR}/methylation/{SAMPLE}.step05_liftover_hap1.log"
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 10000
+    threads: THREADS
+    shell:
+        """
+        exec > >(tee -a {log}) 2>&1
+        sh {SCRIPTS_DIR}/05.liftover_to_otherRef.sh \
+        {input.matbed} \
+        {params.mainDir} \
+        {params.sample} \
+        {params.hap_num} \
+        {input.chain}
+        """
+
+rule step05_liftover_hap2:
+    input:
+        matbed=lambda wildcards: MATBED if MATBED else f"{OUTDIR}/methylation/{SAMPLE}.pri.meth.filt.bed",
+        chain=lambda wildcards: CHAIN_HAP2_PATH
+    output:
+        ref_bed=f"{OUTDIR}/methylation/{SAMPLE}_hap2.meth.{REF_NAME}.bed"
+    params:
+        sample=SAMPLE,
+        mainDir=OUTDIR,
+        hap_num="hap2"
+    log:
+        f"{OUTDIR}/methylation/{SAMPLE}.step05_liftover_hap2.log"
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 10000
+    threads: THREADS
+    shell:
+        """
+        exec > >(tee -a {log}) 2>&1
+        sh {SCRIPTS_DIR}/05.liftover_to_otherRef.sh \
+        {input.matbed} \
+        {params.mainDir} \
+        {params.sample} \
+        {params.hap_num} \
+        {input.chain}
+        """
+
+########################################
+# Step 6: Classification of chromosomes
+########################################
+rule step06_chromAssign:
+    input:
+        hap1_chain=CHAIN_HAP1_PATH,
+        hap2_chain=CHAIN_HAP2_PATH
+    output:
+        chrom_assign=f"{OUTDIR}/chain/{REF_NAME}_to_{SAMPLE}.chromAssign.filtered.txt"
+    params:
+        sample=SAMPLE,
+        mainDir=OUTDIR,
+        REF_NAME=REF_NAME,
+        min_align_length=10000
+    log:
+        f"{OUTDIR}/chain/{SAMPLE}.step06_chromAssign.log"
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 10000
+    threads: THREADS
+    shell:
+        """
+        exec > >(tee -a {log}) 2>&1
+        echo "Assigning chromosomes for {params.sample}"
+        sh {SCRIPTS_DIR}/06.ChromosomeAssign.sh \
+        {params.mainDir} \
+        {params.sample} \
+        {params.REF_NAME} \
+        {params.min_align_length} \
+        {input.hap1_chain} \
+        {input.hap2_chain}
+        """
+
+########################################
+# Step 7: Classification of parental origin
+########################################
+# Check if chrY is present in the chromAssign.filtered.txt file
+
+rule step07_check_XX_XY:
+    input:
+        chrom_assign_file = f"{OUTDIR}/chain/{REF_NAME}_to_{SAMPLE}.chromAssign.filtered.txt"
+    output:
+        chrom_list_out = f"{OUTDIR}/prediction/{SAMPLE}.chroms.txt",
+        fofn_out = f"{FOFN_PATH}"
+    params:
+        sample=SAMPLE,
+        mainDir=OUTDIR,
+        REF_NAME=REF_NAME
+    log:
+        f"{OUTDIR}/prediction/{SAMPLE}.step07_check_XX_XY.log"
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 10000
+    threads: THREADS
+    run:
+        import os
+
+        sample = params.sample
+        outdir = params.mainDir
+        ref = params.REF_NAME
+
+        os.makedirs(os.path.join(outdir, "prediction"), exist_ok=True)
+
+        chrom_assign_file = input.chrom_assign_file
+
+        # chroms = ["chr22"]  # start list (avoid mutating global state)
+        chroms = [f"chr{i}" for i in range(1, 23)] + ["chrX"]
+
+        if os.path.exists(chrom_assign_file):
+            with open(chrom_assign_file) as fh:
+                # more efficient than read() for large files:
+                # 4th column is greater than 10000000 and 1st column is chrY, then it's XY sample
+                has_chrY = any(line.split()[0] == "chrY" and int(line.split()[3]) > 10_000_000 for line in fh)
+
+            if has_chrY:
+                print("chrY found in chromAssign.filtered.txt, XY sample detected.")
+                # save "$sample\tMale" to sex file
+                with open(f"{outdir}/prediction/{sample}.sex.txt", "w") as f:
+                    f.write(f"{sample}\tMale\n")
+
+            else:
+                print("chrY not found in chromAssign.filtered.txt, XX sample detected.")
+                # save "$sample\tFemale" to sex file
+                with open(f"{outdir}/prediction/{sample}.sex.txt", "w") as f:
+                    f.write(f"{sample}\tFemale\n")
+
+        # Write chrom list to file (one per line)
+        with open(output.chrom_list_out, "w") as f:
+            for c in chroms:
+                f.write(c + "\n")
+
+        fofn = outdir + "/prediction/" + sample + ".fofn"
+        if os.path.exists(fofn):
+            print(f"FOFN file already exists: {fofn}, skipping creation.")
+        else:
+            with open(outdir + "/prediction/" + sample + ".fofn", "w") as f:
+                f.write(f"{sample}\tHap1\t{outdir}/methylation/{sample}_hap1.meth.{ref}.bed\n")
+                f.write(f"{sample}\tHap2\t{outdir}/methylation/{sample}_hap2.meth.{ref}.bed\n")
+        
+
+print(f"Chromosomes to process for parent-of-origin prediction: {chroms}")
+
+########################################
+# Step 8: Parent of origin prediction
+########################################
+rule step08_parent_of_origin_prediction:
+    input:
+        hap1_bed=lambda wildcards: MET_HAP1_REFERENCE_BED if MET_HAP1_REFERENCE_BED else f"{OUTDIR}/methylation/{SAMPLE}_hap1.meth.{REF_NAME}.bed",
+        hap2_bed=lambda wildcards: MET_HAP2_REFERENCE_BED if MET_HAP2_REFERENCE_BED else f"{OUTDIR}/methylation/{SAMPLE}_hap2.meth.{REF_NAME}.bed",
+        sex = lambda wildcards: SEX if SEX else f"{OUTDIR}/prediction/${SAMPLE}.sex.txt"
+    output:
+        prediction=f"{OUTDIR}/prediction/{{chroms}}.predict.out"
+    log:
+        f"{OUTDIR}/prediction/{{chroms}}.step08_parent_of_origin_prediction.log"
+    params:
+        sample=SAMPLE,
+        mainDir=OUTDIR,
+        pooch_tool_dir=f"{POFO_TOOLS_DIR}/src/pofo_tools/",
+        model=lambda wc: f"{MODELS}/elasticnet_bestmodel_{wc.chroms}.*pkl",
+        REF_NAME=REF_NAME
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 10000
+    threads: THREADS
+    shell:
+        """
+        exec > >(tee -a {log}) 2>&1
+        echo "Predicting parent of origin for {params.sample} on chromosome {wildcards.chroms}"
+
+        sh {SCRIPTS_DIR}/07.ParentOfOriginPrediction.sh \
+        {params.pooch_tool_dir} \
+        {params.mainDir} \
+        {params.model} \
+        {params.sample} \
+        {params.REF_NAME} \
+        {wildcards.chroms} \
+        {input.hap1_bed} \
+        {input.hap2_bed} \
+        {input.sex}
+        """
+
+rule step09_cleaning_output:
+    input:
+        prediction=expand(f"{OUTDIR}/prediction/{{chroms}}.predict.out", chroms=chroms)
+    output:
+        prediction_concat=f"{OUTDIR}/prediction/{SAMPLE}.predict.out"
+    params:
+        sample=SAMPLE,
+        mainDir=OUTDIR,
+        REF_NAME=REF_NAME
+    log:
+        f"{OUTDIR}/prediction/{SAMPLE}.step09_cleaning_output.log"
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 10000
+    threads: THREADS 
+    run: 
+        import os
+
+        output_lines = []
+        sample = params.sample
+        outdir = params.mainDir
+        ref = params.REF_NAME
+
+        for filepath in input.prediction:
+            
+            filename = os.path.basename(filepath)
+            chrom = filename.replace(".predict.out", "")
+
+            with open(filepath) as f:
+                for line in f:
+                    line = line.rstrip("\n")
+                    if not line.startswith("Sample"):
+                        output_lines.append(f"{line}\t{chrom}")
+
+        with open(output.prediction_concat, "w") as f:
+            f.write("Sample\tLeftOpHapLabel\tRightOpHapLabel\tLeftHapPredictedOrigin\tRightHapPredictedOrigin\tPredictProb_Maternal-Paternal\tPredictProb_Paternal-Maternal\tPredictionCorrect\tChrom\n")
+            for out in output_lines:
+                f.write(out + "\n")
+        

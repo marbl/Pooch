@@ -1,0 +1,72 @@
+Assuming unrestricted shared filesystem usage.
+None
+host: cn0021
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 10
+Rules claiming more threads will be scaled down.
+Conda environments: ignored
+Job stats:
+job                     count
+--------------------  -------
+align                       1
+all                         1
+call_methylation            1
+liftover_methylation        1
+make_chain                  1
+split_fa                    1
+total                       6
+
+Select jobs to execute...
+Execute 2 jobs...
+[Thu Nov 13 14:32:17 2025]
+localrule align:
+    input: /vf/users/Phillippy/projects/poo_snakemake/test/chr22.kolf.fa
+    output: output/alignments/output.pri.bam
+    jobid: 3
+    reason: Missing output files: output/alignments/output.pri.bam; Set of input files has changed since last execution; Params have changed since last execution: Union of exclusive params before and now across all output: before: 'resources/reads.fastq,resources/reads2.fastq' now: '/vf/users/Phillippy/projects/poo_snakemake/test/chr22.kolf.mrg.fastq' 
+    resources: tmpdir=/tmp
+[Thu Nov 13 14:32:17 2025]
+localrule split_fa:
+    input: /vf/users/Phillippy/projects/poo_snakemake/test/chr22.kolf.fa
+    output: output/chain/output.hap1.fa, output/chain/output.hap2.fa
+    jobid: 5
+    reason: Missing output files: output/chain/output.hap1.fa, output/chain/output.hap2.fa
+    resources: tmpdir=/tmp
+RuleException:
+CalledProcessError in file "/vf/users/Phillippy/projects/poo_snakemake/main/Snakefile", line 51:
+Command 'set -euo pipefail;  
+        echo "Aligning output reads to /vf/users/Phillippy/projects/poo_snakemake/test/chr22.kolf.fa using ONT"
+        sh scripts/00.align_winnowmap.sh /vf/users/Phillippy/projects/poo_snakemake/test/chr22.kolf.fa output output /vf/users/Phillippy/projects/poo_snakemake/test/chr22.kolf.mrg.fastq ONT 1' returned non-zero exit status 127.
+[Thu Nov 13 14:32:17 2025]
+Error in rule align:
+    message: None
+    jobid: 3
+    input: /vf/users/Phillippy/projects/poo_snakemake/test/chr22.kolf.fa
+    output: output/alignments/output.pri.bam
+    shell:
+        
+        echo "Aligning output reads to /vf/users/Phillippy/projects/poo_snakemake/test/chr22.kolf.fa using ONT"
+        sh scripts/00.align_winnowmap.sh /vf/users/Phillippy/projects/poo_snakemake/test/chr22.kolf.fa output output /vf/users/Phillippy/projects/poo_snakemake/test/chr22.kolf.mrg.fastq ONT 1
+        
+        (command exited with non-zero exit code)
+RuleException:
+CalledProcessError in file "/vf/users/Phillippy/projects/poo_snakemake/main/Snakefile", line 71:
+Command 'set -euo pipefail;  
+        echo "Splitting personalized genome /vf/users/Phillippy/projects/poo_snakemake/test/chr22.kolf.fa into hap1 and hap2"
+        sh scripts/01.splitFa.sh /vf/users/Phillippy/projects/poo_snakemake/test/chr22.kolf.fa output _1 _2 output' returned non-zero exit status 127.
+[Thu Nov 13 14:32:17 2025]
+Error in rule split_fa:
+    message: None
+    jobid: 5
+    input: /vf/users/Phillippy/projects/poo_snakemake/test/chr22.kolf.fa
+    output: output/chain/output.hap1.fa, output/chain/output.hap2.fa
+    shell:
+        
+        echo "Splitting personalized genome /vf/users/Phillippy/projects/poo_snakemake/test/chr22.kolf.fa into hap1 and hap2"
+        sh scripts/01.splitFa.sh /vf/users/Phillippy/projects/poo_snakemake/test/chr22.kolf.fa output _1 _2 output
+        
+        (command exited with non-zero exit code)
+WorkflowError:
+Failed to open source file /vf/users/Phillippy/projects/poo_snakemake/main/envs/pooch_env.yaml
+FileNotFoundError: [Errno 2] No such file or directory: '/vf/users/Phillippy/projects/poo_snakemake/main/envs/pooch_env.yaml'

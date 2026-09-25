@@ -1,0 +1,158 @@
+# INPUTS
+import os
+import re
+import pandas as pd
+
+FOFN 				= 	config.get("fofn","")
+SEX 				= 	config.get("sex_map","")
+CHROMS              =   config.get("chrom","")
+OUTDIR              =   config.get("output_dir","")
+OUTPUT_PREFIX       =   config.get("output_prefix", "")
+MISSINGRATE         =   config.get("missing_rate","5.0")
+THREADS             =   config.get("threads",10)
+SEXCHROM            =   config.get("sexchrom","")
+
+# Directories and file paths
+POFO_TOOLS_DIR      =   workflow.basedir + "/../pofo_tools"
+SCRIPTS_DIR         =   workflow.basedir + "/workflow/scripts"
+CHROMS              =   [chrom for chrom in CHROMS.split(",") if chrom]
+
+if SEX and SEXCHROM:
+    sex_map         =   pd.read_csv(SEX, sep='\t', header=0)
+    sexes           =   sex_map.iloc[:, 1].astype(str).str.lower().unique()
+    print(f"Sexes found in sex map: {sexes}")
+    if len(sexes) == 1 and sexes[0] == "male":
+        CHROMS      =   [chrom for chrom in CHROMS if chrom != SEXCHROM]
+
+CHROMS_PATTERN      =   "|".join(re.escape(chrom) for chrom in CHROMS)
+
+wildcard_constraints:
+    chroms          =   CHROMS_PATTERN
+
+## PARAMETER PRINTING ##
+print(f"FOFN: {FOFN}")
+print(f"SEX: {SEX}")
+print(f"CHROMS: {CHROMS}")
+print(f"OUTDIR: {OUTDIR}")
+print(f"OUTPUT_PREFIX: {OUTPUT_PREFIX}")
+print(f"MISSINGRATE: {MISSINGRATE}")
+
+rule all:
+    input:
+        f"{OUTDIR}/training/{OUTPUT_PREFIX}.training.out"
+
+# ########################################
+# Step 1 : Make Pooch format
+########################################
+rule step01_Make_Pooch_Inputs:
+    input:
+        fofn            =   FOFN,
+        sex             =   SEX,
+    output:
+        diffMethyl      =   f"{OUTDIR}/training/{{chroms}}.missing_rate_{MISSINGRATE}.createDiffDatasetFromMethylDataset.out"
+    log:
+        diffMethyl_log  =   f"{OUTDIR}/training/{{chroms}}.makeInputs.log"
+    params:
+        sample          =   OUTPUT_PREFIX,
+        mainDir         =   OUTDIR,
+        pofo            =   f"{POFO_TOOLS_DIR}/src/pofo_tools/",
+        script          =   f"{SCRIPTS_DIR}",
+        chroms          =   lambda wc: wc.chroms,
+        missingrate      =   MISSINGRATE,
+    resources:
+        mem_mb          =   lambda wildcards, attempt: attempt * 10000
+    threads: THREADS
+    shell: 
+        """
+        exec > >(tee -a {log}) 2>&1
+        echo "Predicting parent of origin for {params.sample} on chromosome {wildcards.chroms}"
+        
+        ## Step1 : Run Pooch : createMethylDataset
+        echo "Creating methylation dataset for {params.sample} on chromosome {wildcards.chroms}"
+        python {params.pofo}/createMethylDataset.py \
+            --chr {wildcards.chroms} \
+            --input-fofn {input.fofn} \
+            --sex-mapping-file {input.sex} \
+            --output-file {params.mainDir}/training/{wildcards.chroms}.createMethylDataset.out \
+            --log-file {params.mainDir}/training/{wildcards.chroms}.createMethylDataset.log
+
+        echo "Filtering methyl dataset for {wildcards.chroms} with missing rate {params.missingrate}"
+        cd {params.mainDir}/training/
+        python {params.script}/10.filterMissingRate.py {wildcards.chroms} {params.missingrate}
+
+        echo "Creating differential methylation dataset for {params.sample} on chromosome {wildcards.chroms}"
+        python {params.pofo}/createDiffDatasetFromMethylDataset.py \
+            --input-methyl-dataset {wildcards.chroms}.missing_rate_{params.missingrate}.createMethylDataset.out \
+            -L Maternal -R Paternal \
+            -c {wildcards.chroms} \
+            -l {wildcards.chroms}.missing_rate_{params.missingrate}.createDiffDatasetFromMethylDataset.log \
+            --output-file {wildcards.chroms}.missing_rate_{params.missingrate}.createDiffDatasetFromMethylDataset.out
+        """
+
+
+########################################
+# Step 2 : Train Model
+########################################
+rule step02_Train_Model:
+    input:
+        diffMethylFilt  =   f"{OUTDIR}/training/{{chroms}}.missing_rate_{MISSINGRATE}.createDiffDatasetFromMethylDataset.out"
+    output:
+        model           =   f"{OUTDIR}/training/elasticnet_bestmodel_{{chroms}}.pkl",
+        stat            =   f"{OUTDIR}/training/elasticnet_selected_cpgs_{{chroms}}.csv"
+    log:
+        training_log    =   f"{OUTDIR}/training/{{chroms}}.training.log"
+    params:
+        sample          =   OUTPUT_PREFIX,
+        mainDir         =   OUTDIR,
+        pofo            =   f"{POFO_TOOLS_DIR}/src/pofo_tools/",
+        chroms          =   lambda wc: wc.chroms,  
+        script          =   f"{SCRIPTS_DIR}",
+        missingRate     =   MISSINGRATE,
+    resources:
+        mem_mb          =   lambda wildcards, attempt: attempt * 10000
+    threads: THREADS
+    shell: 
+        """
+        exec > >(tee -a {log.training_log}) 2>&1
+        cd {params.mainDir}/training/
+        echo "Training model for {params.sample} on chromosome {wildcards.chroms}"
+        python {params.script}/09.elasticNet.NestedCV.py {wildcards.chroms} {params.missingRate}
+        """
+### Step 3 : Cleaning Output
+
+
+rule step03_cleaning_output:
+    input:
+        stat        =   expand(f"{OUTDIR}/training/elasticnet_selected_cpgs_{{chroms}}.csv", chroms=CHROMS),
+    output:
+        statConcat  =   f"{OUTDIR}/training/{OUTPUT_PREFIX}.training.out"
+    params:
+        sample      =   OUTPUT_PREFIX,
+        mainDir     =   OUTDIR
+    resources:
+        mem_mb      = lambda wildcards, attempt: attempt * 10000
+    threads: THREADS 
+    run: 
+
+        import os
+
+        output_lines = []
+        sample = params.sample
+        outdir = params.mainDir
+
+        for filepath in input.stat:
+            
+            filename = os.path.basename(filepath)
+            chrom = filename.replace("elasticnet_selected_cpgs_", "").replace(".csv", "")
+
+            with open(filepath) as f:
+                for line in f:
+                    line = line.rstrip("\n")
+                    if not line.startswith("original_CpG"):
+                        output_lines.append(f"{line},{chrom}")
+
+        with open(output.statConcat, "w") as f:
+            f.write("original_CpG,selected_CpG,cv_auc,best_c,best_l1_ratio,chrom\n")
+            for out in output_lines:
+                f.write(out + "\n")
+        

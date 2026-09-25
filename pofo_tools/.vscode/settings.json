@@ -1,0 +1,47 @@
+{
+	"files.exclude": {
+		"**.git/**": true,
+		"**/__Pycache__": true,
+		"**/.pytest_cache": true,
+		"failed_or_abandoned/": true,
+		"**/*backup*/**": true
+	},
+	"files.watcherExclude": {
+		"**/*.png": true,
+		"**/*.pdf": true,
+
+		// shared with search.exclude
+		"**/logs/**": true,
+		"**/*temp*/**": true,
+		"**/*tmp*/**": true,
+		"**/*temp*": true,
+		"**/*tmp*": true,
+		"**/*.csv": true,
+		"**/*.tsv": true,
+		"**/*.bed": true,
+		"**/*.bedGraph": true,
+		"**/*.wig": true,
+		"**/*.bw": true
+	},
+	"search.exclude": {
+		"**/*.err": true,
+		"**/*.out": true,
+		"**/*.log": true,
+		"**/*.jid": true,
+
+		// shared with files.watcherExclude
+		"**/logs/**": true,
+		"**/*temp*/**": true,
+		"**/*tmp*/**": true,
+		"**/*temp*": true,
+		"**/*tmp*": true,
+		"**/*.csv": true,
+		"**/*.tsv": true,
+		"**/*.bed": true,
+		"**/*.bedGraph": true,
+		"**/*.wig": true,
+		"**/*.bw": true
+	},
+	"python.defaultInterpreterPath": "python3",
+	"editor.formatOnSave": false
+}
