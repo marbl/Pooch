@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use POOCH in your research, please cite this software."
 title: "POOCH: Parent-of-Origin Classification of Haplotypes"
 type: software
-version: 0.1.0
+version: "0.1.0"
 
 repository-code: "https://github.com/marbl/Pooch"
 

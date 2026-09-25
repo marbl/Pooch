@@ -4,6 +4,11 @@ All notable changes to POOCH will be documented in this file.
 
 The project follows [Semantic Versioning](https://semver.org/).
 
+## [0.1.0] - 2026-09-25
+
+### Fixed
+- update release workflow permissions
+
 ## 0.1.0
 
 ### Added
