@@ -73,8 +73,7 @@ print(f"Provided hap2 fasta	: {PERSONALIZEDGENOME_HAP2}")
 print(f"MET_HAP1_REFERENCE_BED	: {MET_HAP1_REFERENCE_BED}")
 print(f"MET_HAP2_REFERENCE_BED  : {MET_HAP2_REFERENCE_BED}")
 
-
-chroms = CHROMS.str.split(",")
+chroms = CHROMS.split(",")
 
 # if bam file is provided, skip alignment step
 if BAM:
@@ -252,8 +251,8 @@ rule step03_make_chain:
             hap1_fa="{params.mainDir}/{params.sample}.hap1.fa"
             hap2_fa="{params.mainDir}/{params.sample}.hap2.fa"
         fi
-        sh {SCRIPTS_DIR}/03.make_chain_personal_reference.sh {input.reference} "$hap1_fa" {params.mainDir} {params.REF_NAME} {params.sample}.hap1 
-        sh {SCRIPTS_DIR}/03.make_chain_personal_reference.sh {input.reference} "$hap2_fa" {params.mainDir} {params.REF_NAME} {params.sample}.hap2
+        sh {SCRIPTS_DIR}/03.make_chain_personal_reference.sh {params.reference} "$hap1_fa" {params.mainDir} {params.REF_NAME} {params.sample}.hap1 
+        sh {SCRIPTS_DIR}/03.make_chain_personal_reference.sh {params.reference} "$hap2_fa" {params.mainDir} {params.REF_NAME} {params.sample}.hap2
         """
 
 ########################################
@@ -294,7 +293,7 @@ rule step04_call_methylation:
 ########################################
 rule step05_liftover_hap1:
     input:
-        matbed=lambda wildcards: MATBED if MATBED else f"{OUTDIR}/methylation/{SAMPLE}.pri.meth.filt.bed",
+        matbed=lambda wildcards: MET_ON_PERSONALIZEDGENOME_PATH if MET_ON_PERSONALIZEDGENOME_PATH else f"{OUTDIR}/methylation/{SAMPLE}.pri.meth.filt.bed",
         chain=lambda wildcards: CHAIN_HAP1_PATH
     output:
         ref_bed=f"{OUTDIR}/methylation/{SAMPLE}_hap1.meth.{REF_NAME}.bed"
@@ -320,7 +319,7 @@ rule step05_liftover_hap1:
 
 rule step05_liftover_hap2:
     input:
-        matbed=lambda wildcards: MATBED if MATBED else f"{OUTDIR}/methylation/{SAMPLE}.pri.meth.filt.bed",
+        matbed=lambda wildcards: MET_ON_PERSONALIZEDGENOME_PATH if MET_ON_PERSONALIZEDGENOME_PATH else f"{OUTDIR}/methylation/{SAMPLE}.pri.meth.filt.bed",
         chain=lambda wildcards: CHAIN_HAP2_PATH
     output:
         ref_bed=f"{OUTDIR}/methylation/{SAMPLE}_hap2.meth.{REF_NAME}.bed"
@@ -386,6 +385,7 @@ rule step07_check_XX_XY:
         chrom_assign_file = f"{OUTDIR}/chain/{REF_NAME}_to_{SAMPLE}.chromAssign.filtered.txt"
     output:
         chrom_list_out = f"{OUTDIR}/prediction/{SAMPLE}.chroms.txt",
+        sex_out = DEFAULT_SEX,
         fofn_out = f"{FOFN_PATH}"
     params:
         sample=SAMPLE,
@@ -451,9 +451,11 @@ rule step08_parent_of_origin_prediction:
     input:
         hap1_bed=lambda wildcards: MET_HAP1_REFERENCE_BED if MET_HAP1_REFERENCE_BED else f"{OUTDIR}/methylation/{SAMPLE}_hap1.meth.{REF_NAME}.bed",
         hap2_bed=lambda wildcards: MET_HAP2_REFERENCE_BED if MET_HAP2_REFERENCE_BED else f"{OUTDIR}/methylation/{SAMPLE}_hap2.meth.{REF_NAME}.bed",
-        sex = lambda wildcards: SEX if SEX else f"{OUTDIR}/prediction/${SAMPLE}.sex.txt"
+        sex = lambda wildcards: SEX if SEX else DEFAULT_SEX
     output:
         prediction=f"{OUTDIR}/prediction/{{chroms}}.predict.out"
+    wildcard_constraints:
+        chroms=r"chr[0-9XYM]+"
     log:
         f"{OUTDIR}/prediction/{{chroms}}.step08_parent_of_origin_prediction.log"
     params:

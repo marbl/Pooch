@@ -101,7 +101,7 @@ Optional precomputed files:
     --chain_hap2 FILE                  Precomputed haplotype 2 chain file
 
 Run options:
-    -p, --platform VALUE               Sequencing platform, required with FASTQ or BAM
+    -p, --platform VALUE               Sequencing platform, required with FASTQ or BAM, ONT or HiFi
     -t, --threads INT                  Number of Snakemake cores
                                         Default: 10
     --aligner VALUE                    Winnowmap2 or Minimap2
