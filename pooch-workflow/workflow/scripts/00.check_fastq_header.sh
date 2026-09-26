@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-echo -n "Checking fastq headers for MM tag..."
+echo -e "Checking fastq headers for MM tag...\n"
 fastq_list=$1
 outdir=$2
 sample=$3
@@ -13,9 +13,12 @@ count_MM=0
 count_no_MM=0
 for fastq in "${fastq_list_sep[@]}"
 do
-header_check=$(less $fastq | head -1| grep -w "MM")
+# Ml or MM
+header_check_MM=$(less $fastq | head -1| grep -w "MM")
+header_check_Mm=$(less $fastq | head -1| grep -w "Mm")
+
 # echo $fastq
-if [[ -z "$header_check" ]]; then
+if [[ -z "$header_check_Mm" && -z "$header_check_MM" ]]; then
     echo "Error: $fastq does not contain MM tag in the header. Please check the fastq file."
     count_no_MM=$((count_no_MM + 1))
 else

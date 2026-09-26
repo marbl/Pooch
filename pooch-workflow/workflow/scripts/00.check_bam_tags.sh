@@ -1,5 +1,6 @@
 #!/bin/bash
 # load module and load samtools if available
+# check if samtools module is available
 if command -v module >/dev/null 2>&1; then
     module load samtools
 fi
@@ -15,7 +16,8 @@ bam=$1
 outdir=$2
 sample=$3
 
-met=$(samtools view "$bam" | head -10000 | grep --extended-regexp "MM:Z:C\+m\?|ML:B:C" | wc -l)
+# MM or Mm
+met=$(samtools view "$bam" | head -10000 | grep --extended-regexp "Mm:Z:C|MM:Z:C\+m\?|ML:B:C" | wc -l)
 if [ "$met" -gt 0 ]; then
     echo "MM tag found in BAM file."
     touch "${outdir}/alignments/${sample}.step0_methylation_tag_check.done"
