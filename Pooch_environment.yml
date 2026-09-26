@@ -101,6 +101,7 @@ dependencies:
   - ncurses=6.5=h2d0b736_3
   - numpy=2.3.5=py313hf6604e3_0
   - ont-modkit=0.5.0=hcdda2d0_2
+  - conda-forge::openjdk
   - openssl=3.6.0=h26f9b46_0
   - paf2chain=0.1.1=h3ab6199_0
   - pango=1.56.3=h9ac818e_1
