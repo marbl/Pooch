@@ -2,10 +2,6 @@
 
 # Liftover methylation calls to another reference genome using modkit
 # Usage: ./03.liftover_to_otherRef.sh <bam.file> <output.dir> <sample.name> <core>
-if command -v module >/dev/null 2>&1; then
-    module load crossmap
-    module load bedtools
-fi
 
 ########################## INPUTS ##########################
 PERSONAL_BED="$1" #filt methylation bed file based on personalized diploid coordinates
@@ -19,7 +15,7 @@ REF_NAME=CHM13
 mkdir -p "$MAINDIR/methylation"
 mkdir -p "$MAINDIR/logs"
 
-tools=(crossmap bedtools)
+tools=(CrossMap bedtools)
 for tool in "${tools[@]}"; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "Error: $tool is not installed or not in PATH."
@@ -54,7 +50,7 @@ else
 fi
 
 # Liftover methylation calls to the reference genome using CrossMap
-crossmap bed $NEW_CHAIN $PERSONAL_BED $FIRST_LIFT_BED
+CrossMap bed --chromid a $NEW_CHAIN $PERSONAL_BED $FIRST_LIFT_BED
 
 # Adjust the coordinates based on the strand information
 if [[ $STRAND == "-" ]]; then
