@@ -16,7 +16,7 @@ export PATH="$SCRIPT_DIR/../envs/bin/:$PATH"
 
 # check if all command tools are available
 # rb : rustybam
-for tool in nextflow minimap2 blat crossmap python maf-convert rb chaintools_bio; do
+for tool in nextflow minimap2 blat python maf-convert rb chaintools_bio; do
     if ! command -v $tool >/dev/null 2>&1; then
         echo "Error: $tool is not installed or not in PATH."
         exit 1
