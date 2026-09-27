@@ -105,7 +105,7 @@ dependencies:
   - mysql-connector-c=6.1.11=h659d440_1008
   - ncurses=6.5=h2d0b736_3
   - numpy=2.3.5=py313hf6604e3_0
-  - ont-modkit=0.5.0=hcdda2d0_2
+  - bioconda::ont-modkit==0.6.4
   - conda-forge::openjdk
   - openssl=3.6.0=h26f9b46_0
   - bioconda::p7zip
@@ -158,10 +158,12 @@ dependencies:
   - bioconda::ucsc-axtchain
   - bioconda::ucsc-axttomaf
   - bioconda::ucsc-blat
+  - bioconda::ucsc-chainantirepeat
   - bioconda::ucsc-chainmergesort
   - bioconda::ucsc-chainnet
   - bioconda::ucsc-chainprenet
   - bioconda::ucsc-chainsplit
+  - bioconda::ucsc-chainstitchid
   - bioconda::ucsc-chaintoaxt
   - bioconda::ucsc-fasize
   - bioconda::ucsc-fasplit
@@ -169,6 +171,7 @@ dependencies:
   - bioconda::ucsc-lavtopsl
   - bioconda::ucsc-liftover
   - bioconda::ucsc-liftup
+  - bioconda::ucsc-netchainsubset
   - bioconda::ucsc-netsyntenic
   - bioconda::ucsc-twobitinfo
   - bioconda::ucsc-wigtobigwig
