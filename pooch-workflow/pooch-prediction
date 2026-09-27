@@ -369,9 +369,11 @@ if [[ (-n "$MET_HAP1_ON_REF" && -n "$MET_HAP2_ON_REF") ]]; then
     mkdir -p "$outdir_path/chain"
     cat $MET_HAP1_ON_REF_FILE | cut -f 1 | uniq -c | awk '$1 > 10000 {print $2,"hap1"_$2,".",$1}' OFS='\t' > $outdir_path/chain/${REF_NAME_VAL}_to_${OUTPUT_PREFIX_VAL}.chromAssign.filtered.txt
     cat $MET_HAP2_ON_REF_FILE | cut -f 1 | uniq -c | awk '$1 > 10000 {print $2,"hap2"_$2,".",$1}' OFS='\t' >> $outdir_path/chain/${REF_NAME_VAL}_to_${OUTPUT_PREFIX_VAL}.chromAssign.filtered.txt
+    mkdir -p "$outdir_path/methylation"
+    ln -s "$MET_HAP1_ON_REF_FILE" "$outdir_path/methylation/${OUTPUT_PREFIX_VAL}_hap1.meth.${REF_NAME_VAL}.bed"
+    ln -s "$MET_HAP2_ON_REF_FILE" "$outdir_path/methylation/${OUTPUT_PREFIX_VAL}_hap2.meth.${REF_NAME_VAL}.bed"
 fi
 
-# Make cute logo
 
 cat <<EOF
 
