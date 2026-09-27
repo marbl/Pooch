@@ -15,6 +15,7 @@ fi
 
 # Default values
 REF_NAME="ref_name=CHM13"
+REF_NAME_VAL="CHM13"
 REF=""
 ## personalized genome
 PERSONALIZED_GENOME=""
@@ -44,6 +45,7 @@ SEX_MAP=""
 PLATFORM=""
 ## Output options
 OUTPUT_PREFIX="output_prefix=pooch_output"
+OUTPUT_PREFIX_VAL="pooch_output"
 OUTDIR="output_dir=pooch_output"
 outdir_path="pooch_output"
 ## running options
@@ -53,6 +55,7 @@ DRY_RUN=""
 TOUCH=""
 STEP=""
 OTHER_ARGS=""
+GRID_ARGS=""
 
 # Help function
 usage() {
@@ -109,6 +112,8 @@ Run options:
     --step STEP                        Specific Snakemake target or rule to run
     --dry-run                          Build the DAG without running jobs
     --touch                            Mark outputs as up to date without running jobs
+    --grid                             Submit each step as a cluster job (Slurm/SGE/LSF/PBS auto-detected)
+    --grid-opts "ARGS"                 Extra scheduler options for --grid, e.g. "--partition=med --account=abc"
     --snakeopts "ARGS"                 Extra arguments passed directly to Snakemake
     -h, --help, --helpme               Show this help message and exit
 
@@ -189,6 +194,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         -rn|--reference_name)
             REF_NAME="ref_name=$2"
+            REF_NAME_VAL="$2"
             shift 2
             ;;
         -pg|--personalized_genome)
@@ -197,6 +203,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         -o|--output_prefix)
             OUTPUT_PREFIX="output_prefix=$2"
+            OUTPUT_PREFIX_VAL="$2"
             shift 2
             ;;
         -t|--threads)
@@ -227,10 +234,12 @@ while [[ $# -gt 0 ]]; do
             ;;
         -m1r|--met_hap1_on_ref)
 	    MET_HAP1_ON_REF="met_hap1_on_reference=$(realpath $2)"
+        MET_HAP1_ON_REF_FILE=$(realpath "$2")
             shift 2
             ;;
         -m2r|--met_hap2_on_ref)
 	    MET_HAP2_ON_REF="met_hap2_on_reference=$(realpath $2)"
+        MET_HAP2_ON_REF_FILE=$(realpath "$2")
             shift 2
             ;;
         --aligner)
@@ -249,9 +258,19 @@ while [[ $# -gt 0 ]]; do
             STEP="$2"
             shift 2
             ;;
+        --grid-opts)
+            export POOCH_GRID_OPTS="$2"
+            shift 2
+            ;;
         --snakeopts)
             OTHER_ARGS="$2"
             shift 2
+            ;;
+        --grid)
+            GRID_ARGS="--profile $script_dir/profiles \
+                --cluster-generic-submit-cmd '$script_dir/profiles/slurm-sge-submit.sh {threads} {resources.mem_mb} {resources.time_h} {rule} {jobid}' \
+                --cluster-generic-status-cmd '$script_dir/profiles/slurm-sge-status.sh'"
+            shift
             ;;
         *)
             echo "Unknown option: $1"
@@ -284,6 +303,7 @@ fi
 #   2) split fasta mode: --hap1_fa + --hap2_fa
 has_personalized=0
 has_split_fa=0
+mkdir -p "$outdir_path"
 
 if [[ -n "$PERSONALIZED_GENOME" ]]; then
     if [[ ! -n "$HAP1_NAME" || ! -n "$HAP2_NAME" ]]; then
@@ -308,8 +328,6 @@ if [[ -n "$METBED" ]] && [[ $has_personalized -eq 0 && $has_split_fa -eq 0 ]]; t
     exit 1
 fi
 
-
-
 if [[ -n "$HAP1_FA" && -z "$HAP2_FA" ]] || [[ -z "$HAP1_FA" && -n "$HAP2_FA" ]]; then
     echo "Error: --hap1_fa and --hap2_fa must be provided together."
     exit 1
@@ -319,9 +337,6 @@ if [[ $has_split_fa -eq 1 ]] && [[ -z "$HAP1_NAME" || -z "$HAP2_NAME" ]]; then
     echo "Error: split-FA mode requires --hap1_name and --hap2_name so methylation can be separated by haplotype label."
     exit 1
 fi
-
-
-
 
 if [[ -n "$FASTQ" && -z "$BAM" && ($has_personalized -eq 0 && $has_split_fa -eq 0 )]]; then
     echo "Error: FASTQ alignment requires --personalized_genome or --hap1_fa and --hap2_fa."
@@ -344,13 +359,17 @@ if [[ ( -n "$FASTQ" || -n "$BAM" ) && -z "$PLATFORM" ]]; then
     exit 1
 fi
 
-# check methylation tags in fastq file
-#if [[ -n "$FASTQ" ]]; then
-    #echo "Checking fastq headers for MM tag..."
-    #bash $script_dir/workflow/scripts/00.check_fastq_header.sh "$fastq_input"
-#fi
+if [[ ( -n "$MET_HAP1_ON_REF" && -z "$MET_HAP2_ON_REF" ) || ( -z "$MET_HAP1_ON_REF" && -n "$MET_HAP2_ON_REF" ) ]]; then
+    echo "Error: --met_hap1_on_ref and --met_hap2_on_ref must be provided together."
+    exit 1
+fi
 
-mkdir -p "$outdir_path"
+# If both MET_HAP1_ON_REF and MET_HAP2_ON_REF are provided, create chromosome assignment file using their content
+if [[ (-n "$MET_HAP1_ON_REF" && -n "$MET_HAP2_ON_REF") ]]; then
+    mkdir -p "$outdir_path/chain"
+    cat $MET_HAP1_ON_REF_FILE | cut -f 1 | uniq -c | awk '$1 > 10000 {print $2,"hap1"_$2,".",$1}' OFS='\t' > $outdir_path/chain/${REF_NAME_VAL}_to_${OUTPUT_PREFIX_VAL}.chromAssign.filtered.txt
+    cat $MET_HAP2_ON_REF_FILE | cut -f 1 | uniq -c | awk '$1 > 10000 {print $2,"hap2"_$2,".",$1}' OFS='\t' >> $outdir_path/chain/${REF_NAME_VAL}_to_${OUTPUT_PREFIX_VAL}.chromAssign.filtered.txt
+fi
 
 # Make cute logo
 
@@ -373,6 +392,7 @@ CMD="snakemake -s $script_dir/Snakefile-prediction \
     $TOUCH \
     $STEP \
     --cores $THREADS_NUM \
+    $GRID_ARGS \
     $OTHER_ARGS \
     --config \
     $THREADS_CONFIG \
