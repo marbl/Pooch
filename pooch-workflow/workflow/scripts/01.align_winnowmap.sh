@@ -4,9 +4,11 @@ set -euo pipefail
 # Usage: ./00.align_winnowmap.sh <reference.fasta> <output.dir> <sample.name> <reads.fastq> <platform>
 
 if command -v module >/dev/null 2>&1; then
-    module load winnowmap
-    module load samtools
-    module load meryl
+    for module_name in winnowmap samtools meryl; do
+        if ! module load "$module_name"; then
+            printf 'Skipping unavailable module: %s\n' "$module_name" >&2
+        fi
+    done
 fi
 
 # check if the tools are available
@@ -61,8 +63,9 @@ bam_path="$mainDir/alignments/$sample.bam"
 pri_bam_path="$mainDir/alignments/$sample.pri.bam"
 pri_bai_path="$mainDir/alignments/$sample.pri.bam.bai"
 
-sort_tmp_root="${TMPDIR:-/tmp}"
+sort_tmp_root="${mainDir}/alignments/tmp/"
 sort_tmp_dir="${sort_tmp_root%/}/pooch_samtools_sort"
+echo $sort_tmp_dir
 mkdir -p "$sort_tmp_dir"
 if [ ! -w "$sort_tmp_dir" ]; then
     echo "Error: sort tmp directory is not writable: $sort_tmp_dir"
