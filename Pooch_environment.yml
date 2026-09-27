@@ -103,6 +103,7 @@ dependencies:
   - ont-modkit=0.5.0=hcdda2d0_2
   - conda-forge::openjdk
   - openssl=3.6.0=h26f9b46_0
+  - bioconda::p7zip
   - paf2chain=0.1.1=h3ab6199_0
   - pango=1.56.3=h9ac818e_1
   - pb-cpg-tools
@@ -130,8 +131,10 @@ dependencies:
   - r-r6=2.6.1=r44hc72bb7e_1
   - r-rcolorbrewer=1.1.3=r44h785f33e_4
   - r-rlang=1.1.6=r44h3697838_1
+  - conda-forge::r-rmarkdown
   - r-scales=1.4.0=r44hc72bb7e_1
   - r-survival=3.8.3=r44h54b55ab_1
+  - conda-forge::r-tidyverse
   - r-viridislite=0.4.2=r44hc72bb7e_3
   - readline=8.2=h8c095d6_2
   - ruby=3.4.7=hd8161a3_0
@@ -147,7 +150,23 @@ dependencies:
   - threadpoolctl=3.6.0=pyhecae5ae_0
   - tk=8.6.13=noxft_hd72426e_102
   - tktable=2.10=h8d826fa_7
-  - ucsc-liftover=482=h0b57e2e_0
+  - bioconda::ucsc-axtchain
+  - bioconda::ucsc-axttomaf
+  - bioconda::ucsc-blat
+  - bioconda::ucsc-chainmergesort
+  - bioconda::ucsc-chainnet
+  - bioconda::ucsc-chainprenet
+  - bioconda::ucsc-chainsplit
+  - bioconda::ucsc-chaintoaxt
+  - bioconda::ucsc-fasize
+  - bioconda::ucsc-fasplit
+  - bioconda::ucsc-fatotwobit
+  - bioconda::ucsc-lavtopsl
+  - bioconda::ucsc-liftover
+  - bioconda::ucsc-liftup
+  - bioconda::ucsc-netsyntenic
+  - bioconda::ucsc-twobitinfo
+  - bioconda::ucsc-wigtobigwig
   - vcf2maf=1.6.22=hdfd78af_1
   - winnowmap=2.3=h5ca1c30_4
   - xorg-libice=1.1.2=hb9d3cd8_0
@@ -186,5 +205,6 @@ dependencies:
     - scikit-learn==1.9.1
     - seaborn==0.13.2
     - sortedcontainers==2.4.0
+    - zlib-ng==1.0.0
 
 prefix: "/weka/home/jhu/jkim789/miniforge3/envs/pooch"
