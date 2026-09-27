@@ -213,5 +213,3 @@ dependencies:
     - seaborn==0.13.2
     - sortedcontainers==2.4.0
     - zlib-ng==1.0.0
-
-prefix: "/weka/home/jhu/jkim789/miniforge3/envs/pooch"
