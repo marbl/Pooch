@@ -19,7 +19,7 @@ fi
 
 # linked file doesnt work. use physical path to BAM file.
 # if there are supplementary alignments, this script will fail. need to filter out supplementary alignments first.
-if [ ! -f "$mainDir/methylation/${sample}.pri.meth.combined.bed" ]; then
+if [ ! -f "$mainDir/methylation/${sample}.pri.meth.combined.bed.gz" ]; then
     echo -e "Calling methylation for $sample using aligned_bam_to_cpg_scores"
     cmd="aligned_bam_to_cpg_scores \
                 --bam $BAM \
@@ -31,4 +31,4 @@ if [ ! -f "$mainDir/methylation/${sample}.pri.meth.combined.bed" ]; then
     eval $cmd
 fi
 
-cat  "$mainDir/methylation/${sample}.pri.meth.combined.bed"  | grep -v "^#" | cut -f 1,2,3,6,7 > "$mainDir/methylation/${sample}.pri.meth.filt.bed"
+zcat  "$mainDir/methylation/${sample}.pri.meth.combined.bed.gz"  | grep -v "^#" | cut -f 1,2,3,6,7 > "$mainDir/methylation/${sample}.pri.meth.filt.bed"
