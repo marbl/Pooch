@@ -19,9 +19,10 @@ The input contigs do not need to be telomere-to-telomere assemblies and may cons
 ## Installation
 
 ```bash
-# clone this git repository
-git clone https://github.com/marbl/Pooch.git
-cd Pooch/
+# Download the latest version of Pooch from Release tab
+wget https://github.com/marbl/Pooch/archive/refs/tags/v${version}.tar.gz
+tar -zxvf v${version}.tar.gz
+cd Pooch-${version}
 
 # create the environment from the provided yml file
 mamba env create -n pooch -f Pooch_environment.yml
