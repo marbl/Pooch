@@ -23,16 +23,16 @@ The input contigs do not need to be telomere-to-telomere assemblies and may cons
 git clone https://github.com/marbl/Pooch.git
 cd Pooch/
 
-# make new environment usimg yml file
-mamba create -n pooch -f Pooch_environment.yml  -vvv --channel-priority flexible
+# create the environment from the provided yml file
+mamba env create -n pooch -f Pooch_environment.yml
 
-# activate env
+# activate the environment
 mamba activate pooch
 
-# move working directory to pofo_tools within Pooch
-cd pofo_tools/ 
+# move into pofo_tools within Pooch
+cd pofo_tools/
 
-# install python package
+# install the python package
 pip install .
 ```
 
@@ -72,7 +72,7 @@ The most time-consuming step is `step02_align`, and its runtime depends on the s
 
 Choose exactly one genome mode:
 
-1. Personalized genome mode: `--personalized_genome` plus haplotype names provided with `--hap1_name` and `--hap2_name`. For example, if your assembly have contigs as belowe: 
+1. Personalized genome mode: `--personalized_genome` plus haplotype names provided with `--hap1_name` and `--hap2_name`. For example, if your assembly has contigs named as below:
 	```bash
 	contig1_haplotype1
 	contig2_haplotype1
@@ -80,16 +80,21 @@ Choose exactly one genome mode:
 	contig100_haplotype2
 	contig101_haplotype2
 	```
-	
-	hap1_name should be `haplotype1` and hap2_name should be `haplotype2`.
+
+	`--hap1_name` should be `haplotype1` and `--hap2_name` should be `haplotype2`.
 
 2. Split FASTA mode: `--hap1_fa` and `--hap2_fa`
 
 At least one data input is required:
 
-1. `--fastq` (alignment + downstream steps)
-2. `--bam` (skip alignment)
-3. `--metbed` (skip alignment and methylation calling)
+1. `--fastq`: FASTQ file(s) with methylation tags (`MM`/`Mm` or `ML`/`Ml`). If FASTQ is provided, all steps run starting from alignment.
+2. `--bam`: BAM file with methylation tags. If BAM is provided, `pooch-prediction` starts from methylation calling.
+3. `--metbed`: BED file of methylation calls in personalized-genome coordinates. The BED file should have the following columns: chromosome, start, end, total depth, methylated read count.
+	```bash
+	chr22_1 10637   10638   16      16
+	chr22_1 10655   10656   16      14
+	```
+4. `--met_hap1_on_ref` and `--met_hap2_on_ref`: per-haplotype methylation BED files already lifted over to reference coordinates, formatted the same way as above.
 
 ## Quick Start
 
@@ -97,13 +102,17 @@ At least one data input is required:
 
 ```bash
 ./pooch-prediction \
-	--reference ref.fa \ # reference that pre-trained model used
+	--reference ref.fa \
 	--personalized_genome personalized.fa \
-	--hap1_name haplotype1 \ # haplotype 1 name that could grep from the `personalized.fa`
-	--hap2_name haplotype2 \ # haplotype 1 name that could grep from the `personalized.fa`
+	--hap1_name haplotype1 \
+	--hap2_name haplotype2 \
 	--fastq reads_1.fastq.gz,reads_2.fastq.gz \
-	--platform ONT # ONT or HiFi
+	--platform ONT
 ```
+
+- `--reference`: reference genome used by the pre-trained model
+- `--hap1_name` / `--hap2_name`: haplotype labels as they appear in `personalized.fa`
+- `--platform`: `ONT` or `HiFi`
 
 ### 2) Split haplotype FASTA files + BAM
 
@@ -112,18 +121,18 @@ At least one data input is required:
 	--reference ref.fa \
 	--hap1_fa sample.hap1.fa \
 	--hap2_fa sample.hap2.fa \
-	--bam sample.pri.bam \ # BAM aligned on the personalized genome with methylation tags and filter only primary alignments
+	--bam sample.pri.bam
 ```
 
-### 2) Split haplotype FASTA files + BAM
+### 3) Liftover methylation BED files only (skip alignment and methylation calling)
 
 ```bash
 ./pooch-prediction \
-	-m1r sample.hap1.liftover_to_ref.bed \
-	-m2r sample.hap1.liftover_to_ref.bed
+	--met_hap1_on_ref sample.hap1.liftover_to_ref.bed \
+	--met_hap2_on_ref sample.hap2.liftover_to_ref.bed
 ```
 
-### 3) Dry run before execution
+### 4) Dry run before execution
 
 ```bash
 ./pooch-prediction \
@@ -132,11 +141,11 @@ At least one data input is required:
 	--hap1_name haplotype1 \
 	--hap2_name haplotype2 \
 	--fastq reads.fastq.gz \
-	--platform ONT 
+	--platform ONT \
 	--dry-run
 ```
 
-### 4) Mark outputs as up to date
+### 5) Mark outputs as up to date
 
 ```bash
 ./pooch-prediction \
@@ -148,6 +157,24 @@ At least one data input is required:
 	--platform ONT \
 	--touch
 ```
+
+### 6) Submit each rule as a cluster job
+
+```bash
+./pooch-prediction \
+	--reference ref.fa \
+	--personalized_genome personalized.fa \
+	--hap1_name haplotype1 \
+	--hap2_name haplotype2 \
+	--fastq reads.fastq.gz \
+	--platform ONT \
+	--grid \
+	--grid-opts "--partition=norm"
+```
+
+- `--grid`: automatically submits each rule as a cluster job and determines its resource requirements
+- `--grid-opts`: extra scheduler options, e.g. set a partition when no default is configured
+
 
 ### Primary Outputs
 
@@ -183,7 +210,8 @@ Three contigs from haplotype 1 and two contigs from haplotype 2 are assigned to 
 
 Use `pooch-training` to train chromosome-specific parent-of-origin classifiers from a cohort of samples with known maternal and paternal haplotype labels. The training workflow builds methylation matrices, filters CpGs by missingness, creates differential methylation datasets, fits chromosome-specific elastic-net logistic regression models, and writes a summary of selected CpGs and cross-validation performance.
 
-## Pipeline at a glance 
+### Pipeline at a Glance
+
 ```bash
 job                         count
 ------------------------  -------
@@ -230,7 +258,7 @@ Train only selected chromosomes:
 	--chroms chr1,chr2,chr3
 ```
 
-### Main outputs
+### Main Outputs
 
 The main training outputs are written to `OUTDIR/training/`:
 

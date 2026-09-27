@@ -1,5 +1,11 @@
 #!/bin/bash
-
+if command -v module >/dev/null 2>&1; then
+    for module_name in samtools; do
+        if ! module load "$module_name"; then
+            printf 'Skipping unavailable module: %s\n' "$module_name" >&2
+        fi
+    done
+fi
 
 echo -e "Checking fastq headers for MM tag...\n"
 fastq_list=$1

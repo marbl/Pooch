@@ -2,13 +2,11 @@
 # load module and load samtools if available
 # check if samtools module is available
 if command -v module >/dev/null 2>&1; then
-    module load samtools
-fi
-
-# check if samtools is available
-if ! command -v samtools >/dev/null 2>&1; then
-    echo "Error: samtools is not installed or not in PATH."
-    exit 1
+    for module_name in samtools; do
+        if ! module load "$module_name"; then
+            printf 'Skipping unavailable module: %s\n' "$module_name" >&2
+        fi
+    done
 fi
 
 echo -n "Checking BAM file for MM tag..."

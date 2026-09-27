@@ -1,0 +1,50 @@
+
+#  The 'jobscript' is a template used to form the script submitted to the custer
+#  for execution.  The script consists of a call to snakemake to run the
+#  task.  By default, Verkko makes a copy of this script in the
+#  {work_directory}/scripts/ folder.
+#
+#  The 'cluster' script is responsible for submitting the script created by
+#  'jobscript' to the grid for execution.  It expects at least three
+#  arguments (the numbe rof compute threads to use, the amount of memory in
+#  megabytes needed, and the maximum run time allowed, all supplied by
+#  snakemake) with the remaining arguments passed to the end of the submit
+#  command.  The Verkko submit script supports Slurm and SGE.
+#
+#  Snakemake can substitute the following variables into the cluster command
+#  line:
+#    {threads}          - number of threads the rule requests
+#    {resources.mem_gb} - amount of memory. in megabytes, the rule requests (Verkko specific)
+#    {resources.time_h} - time, in hours, the rule requests (Verkko specific)
+#    {name}             - the name of the rule running?
+#    {rulename}         - the name of the rule running
+#    {input}            - list of all the inputs
+#    {output}           - list of all the outputs
+#    {params}           - list of all the parameters
+#    {wildcards}        - 
+#    {log}              - list of all the log files
+#    {dependencies}     - 
+#
+#
+#  The 'cluster-status' script is responsible for returning the status of the
+#  job ID supplied on the command line: 'running', 'success' or 'failed'.
+#  The Verkko status script supports Slurm and SGE.
+#
+#  The jobname is supplied to the grid as the name of a job.
+#    {name}  - the name of the rule being run.
+#    {jobid} - the snakemake job id for this job.  Must be present.
+#
+
+#  Snakemake >= 8: requires snakemake-executor-plugin-cluster-generic.
+#  Submit/status commands are passed by pooch-prediction with absolute paths.
+
+executor: cluster-generic
+jobscript: "jobscript.sh"
+jobname: pooch.{name}.{jobid}.sh
+jobs: 50
+latency-wait: 60
+retries: 1
+
+default-resources:
+  - mem_mb=8000
+  - time_h=24

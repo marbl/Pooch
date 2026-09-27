@@ -4,9 +4,11 @@ set -o pipefail
 # Usage: ./00.align_winnowmap.sh <reference.fasta> <output.dir> <sample.name> <reads.fastq> <platform>
 
 if command -v module >/dev/null 2>&1; then
-    module load minimap2
-    module load samtools
-    module load meryl
+    for module_name in samtools minimap2 meryl; do
+        if ! module load "$module_name"; then
+            printf 'Skipping unavailable module: %s\n' "$module_name" >&2
+        fi
+    done
 fi
 
 ref="$1"

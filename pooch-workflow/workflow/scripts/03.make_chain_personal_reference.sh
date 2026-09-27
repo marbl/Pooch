@@ -1,13 +1,10 @@
 #!/bin/bash
 if command -v module >/dev/null 2>&1; then
-    module load minimap2
-    module load nextflow
-    module load blat
-    module load java
-    module load crossmap
-    module load graphviz
-    module load ucsc
-    module load python/3.9
+    for module_name in minimap2 nextflow blat java graphviz ucsc python/3.9; do
+        if ! module load "$module_name"; then
+            printf 'Skipping unavailable module: %s\n' "$module_name" >&2
+        fi
+    done
 fi
 
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
@@ -16,7 +13,7 @@ export PATH="$SCRIPT_DIR/../envs/bin/:$PATH"
 
 # check if all command tools are available
 # rb : rustybam
-for tool in nextflow minimap2 blat python maf-convert rb chaintools_bio; do
+for tool in nextflow minimap2 blat python  rb chaintools_bio; do
     if ! command -v $tool >/dev/null 2>&1; then
         echo "Error: $tool is not installed or not in PATH."
         exit 1
@@ -83,11 +80,11 @@ if [ ! -f "$OUTDIR/chainnet/liftover.chain" ]; then
     echo "Hint: inspect Nextflow logs in $OUTDIR/.nextflow.log and $OUTDIR/work/*/.command.err"
     exit 1
 fi
-python chaintools_bio split -c $OUTDIR/chainnet/liftover.chain -o $OUTDIR/$PREFIX-split.chain &&
-python chaintools_bio to_paf -c $OUTDIR/$PREFIX-split.chain -t $SOURCEFASTA -q $TARGETFASTA -o $OUTDIR/$PREFIX-split.paf  &&
+chaintools_bio split -c $OUTDIR/chainnet/liftover.chain -o $OUTDIR/$PREFIX-split.chain &&
+chaintools_bio to-paf -c $OUTDIR/$PREFIX-split.chain -t $SOURCEFASTA -q $TARGETFASTA -o $OUTDIR/$PREFIX-split.paf  &&
 #awk '{short1=$1; short2=$6; gsub("_1", "", short1); gsub("_1", "", short2); if(short1==short2) {print}}' $PREFIX-split.paf > $PREFIX-samechr-split.paf  &&
 #cat $PREFIX-samechr-split.paf | rb break-paf --max-size 10000 | rb trim-paf -r | rb invert | rb trim-paf -r | rb invert > $PREFIX.paf  &&
 cat $OUTDIR/$PREFIX-split.paf | rb break-paf --max-size 10000 | rb trim-paf -r | rb invert | rb trim-paf -r | rb invert > $OUTDIR/$PREFIX.paf  &&
 paf2chain -i $OUTDIR/$PREFIX.paf > $OUTDIR/$PREFIX.chain  &&
-python chaintools_bio invert -c $OUTDIR/$PREFIX.chain -o $OUTDIR/$PREFIX.inverted.chain &&
+chaintools_bio invert -c $OUTDIR/$PREFIX.chain -o $OUTDIR/$PREFIX.inverted.chain &&
 touch $OUTDIR/step02.chain.done
