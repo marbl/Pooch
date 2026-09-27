@@ -323,8 +323,8 @@ fi
 
 # Check if --metbed is provied
 
-if [[ -n "$METBED" ]] && [[ $has_personalized -eq 0 && $has_split_fa -eq 0 ]]; then
-    echo "Error: --personalized_genome or (--hap1_fa and --hap2_fa) is required."
+if [[ -n "$METBED" ]] && [[ $has_personalized -eq 0 && $has_split_fa -eq 0 && -z "$CHAIN_HAP1" && -z "$CHAIN_HAP2" ]]; then
+    echo "Error: --personalized_genome or (--hap1_fa and --hap2_fa) or chain files are required."
     exit 1
 fi
 
