@@ -28,13 +28,34 @@ mapFile=$9
 
 mkdir -p "$mainDir/prediction"
 fofn=$mainDir/prediction/$sample.fofn
-
 sex=$(grep -w "$sample" "$mapFile" | awk '{print $2}')
+
 if [ "$sex" == "Male" ] && [ "$chr" == "chrX" ]; then
 	echo "$sample is Male, skipping chromosome X for parent of origin prediction."
 	touch $mainDir/prediction/$chr.predict.out
 	exit 0
 fi
+
+if [ "$sex" == "Female" ] && [ "$chr" == "chrX" ]; then
+	echo -e "$sample is Female and chromosome is $chr"
+	echo -e "Calculate XIST activity" 
+	this_script="$(realpath "$(dirname "$0")")"
+	xist_bed=$this_script/../../resources/xist_promoter.bed
+	hap1_xist_methylation_proportion=$(bedtools intersect -a $xist_bed -b $hap1_met -wa -wb | bedtools merge -i - -c 7,8 -o sum,sum | \
+	awk -v hap="hap1" -v sample=$sample '{print $0,sample,hap}' OFS='\t' | awk '{print $5/$4}')
+	hap2_xist_methylation_proportion=$(bedtools intersect -a $xist_bed -b $hap2_met -wa -wb | bedtools merge -i - -c 7,8 -o sum,sum | \
+	awk -v hap="hap2" -v sample=$sample '{print $0,sample,hap}' OFS='\t' | awk '{print $5/$4}')
+	diff=$(awk -v h1="$hap1" -v h2="$hap2" 'BEGIN {print h1 - h2}')
+	echo -e "Sample\tXIST_diff" > $mainDir/prediction/xist_level.tsv
+	echo -e "$sample\t$diff" >> $mainDir/prediction/xist_level.tsv
+	predict_script=$pooch_tool_dir/predict_parent_origin_xist.py
+	predict_param="--xist $mainDir/prediction/xist_level.tsv"
+	createMethylDataset_script=$pooch_tool_dir/createMethylDataset_xist.py
+else
+	predict_script=$pooch_tool_dir/predict.py
+	createMethylDataset_script=$pooch_tool_dir/createMethylDataset.py
+fi
+
 
 if [ ! -s $fofn ]; then 
 # echo -e "$fofn is not -not empty or does not exist. Please check the file path and ensure it is correct." 
@@ -48,10 +69,9 @@ fi
 # for bed_file in $(cut -f 3 $fofn ); do
 #    sed -i '/^chr/!s/^/chr/' $bed_file
 # done
-
 echo "Creating methylation dataset for $sample on chromosome $chr"
 ## Step1 : Run Pooch : createMethylDataset
-cmd="python $pooch_tool_dir/createMethylDataset.py \
+cmd="python $createMethylDataset_script \
 	--chr $chr \
 	--input-fofn $fofn \
 	--output-file $mainDir/prediction/$chr.createMethylDataset.out \
@@ -78,11 +98,11 @@ fi
 ## Step3 : Run Pooch : predict
 if [[ -f $mainDir/prediction/$chr.createDiffDatasetFromMethylDataset.out ]]; then
 echo "Predicting parent of origin for $sample on chromosome $chr"
-cmd="python $pooch_tool_dir/predict.py \
+cmd="python $predict_script \
 	-i $mainDir/prediction/$chr.createDiffDatasetFromMethylDataset.out \
 	-M $model \
 	-o $mainDir/prediction/$chr.predict.out \
-	-l $mainDir/prediction/$chr.predict.log"
+	-l $mainDir/prediction/$chr.predict.log $predict_param"
 eval $cmd
 else 
 	echo "Error: $mainDir/prediction/$chr.createDiffDatasetFromMethylDataset.out not found. Prediction failed for $sample on chromosome $chr."
